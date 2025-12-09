@@ -1,0 +1,75 @@
+#include "ngram_logic.h"
+#include <omp.h>
+
+
+Histogram count_sequential(const std::vector<std::string>& words, int n_gram_size) {
+    Histogram hist;
+    if (words.size() < (size_t)n_gram_size) return hist;
+
+    for (size_t i = 0; i <= words.size() - n_gram_size; ++i) {
+        std::string n_gram = words[i];
+        for (int j = 1; j < n_gram_size; ++j) {
+            n_gram += " " + words[i+j];
+        }
+        hist[n_gram]++;
+    }
+    return hist;
+}
+
+Histogram count_parallel(const std::vector<std::string>& words, int n_gram_size, int requested_threads) {
+    if (words.size() < (size_t)n_gram_size) return {};
+
+    std::vector<Histogram> local_hists(requested_threads);
+
+    // FASE DI CONTEGGIO PARALLELO
+    #pragma omp parallel num_threads(requested_threads) default(none) \
+        shared(words, n_gram_size, local_hists, requested_threads)
+    {
+        int tid = omp_get_thread_num();
+        Histogram& my_hist = local_hists[tid]; 
+        
+        // Calcolo del limite
+        size_t limit = words.size() - n_gram_size;
+
+        // divisione del lavoro tra i thread
+        #pragma omp for nowait schedule(static)
+        for (size_t i = 0; i <= limit; ++i) { 
+            
+            // Variabile privata al loop
+            std::string n_gram = words.at(i); 
+            
+            // Creazione della stringa N-gramma
+            for (int j = 1; j < n_gram_size; ++j) {
+                n_gram += " " + words.at(i+j); 
+            }
+            my_hist[n_gram]++; 
+        }
+    }
+
+    Histogram final_hist;
+
+    // STIMA DINAMICA DELLA DIMENSIONE TOTALE
+    size_t total_unique_elements = 0;
+    
+    for (const auto& current_hist : local_hists) {
+        total_unique_elements += current_hist.size();
+    }
+    
+    // PRE-ALLOCAZIONE DELLA MAPPA FINALE
+    // Riserva lo spazio esatto calcolato sopra. Questo evita il Re-hashing.
+    final_hist.reserve(total_unique_elements); 
+    
+    // MERGE SEQUENZIALE
+    // Il blocco 'omp master' assicura che solo il thread master esegua l'unione.
+    #pragma omp master 
+    {
+        for (const auto& current_hist : local_hists) { 
+            // Aggiorna la mappa finale
+            for (const auto& pair : current_hist) {
+                final_hist[pair.first] += pair.second; 
+            }
+        }
+    }
+    
+    return final_hist;
+}
