@@ -73,3 +73,67 @@ Histogram count_parallel(const std::vector<std::string>& words, int n_gram_size,
     
     return final_hist;
 }
+
+Histogram count_parallel_document_level(const DocumentCorpus& all_document_words, int n_gram_size, int requested_threads) {
+    
+    if (all_document_words.empty()) {
+        return {};
+    }
+
+    std::vector<Histogram> local_hists(requested_threads);
+    
+    // FASE DI CONTEGGIO PARALLELO (Divisione a Livello di Documento)
+    #pragma omp parallel num_threads(requested_threads) default(none) \
+        shared(all_document_words, n_gram_size, local_hists)
+    {
+        int tid = omp_get_thread_num();
+        Histogram& my_hist = local_hists[tid]; 
+        
+        // Ogni iterazione (doc_index) è un intero documento.
+        #pragma omp for schedule(dynamic)
+        for (size_t doc_index = 0; doc_index < all_document_words.size(); ++doc_index) {
+            
+            const std::vector<std::string>& words = all_document_words[doc_index];
+            
+            // Se il documento è troppo piccolo
+            if (words.size() < (size_t)n_gram_size) continue;
+            
+            size_t limit = words.size() - n_gram_size;
+
+            // Loop SEQUENZIALE all'interno del singolo documento
+            for (size_t i = 0; i <= limit; ++i) { 
+                
+                std::string n_gram = words.at(i); 
+                
+                // Creazione della stringa N-gramma
+                for (int j = 1; j < n_gram_size; ++j) {
+                    n_gram += " " + words.at(i+j); 
+                }
+                
+                // Aggiornamento della mappa locale (NON richiede lock)
+                my_hist[n_gram]++; 
+            }
+        }
+    }
+
+    
+    // FASE DI MERGE SEQUENZIALE
+    Histogram final_hist;
+
+    size_t total_unique_elements = 0;
+    for (const auto& current_hist : local_hists) {
+        total_unique_elements += current_hist.size();
+    }
+    final_hist.reserve(total_unique_elements); 
+    
+    #pragma omp master 
+    {
+        for (const auto& current_hist : local_hists) { 
+            for (const auto& pair : current_hist) {
+                final_hist[pair.first] += pair.second; 
+            }
+        }
+    }
+    
+    return final_hist;
+}

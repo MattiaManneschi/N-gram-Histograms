@@ -8,12 +8,13 @@ TARGET = ngram_analyzer
 SRC_DIR = src
 BIN_DIR = bin
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+NTHREADS ?= 16
 
 .PHONY: all seq par clean run run_seq
 
 # Regola per la compilazione della versione parallela (con OpenMP)
 $(BIN_DIR)/$(TARGET)_par: $(SRCS) | $(BIN_DIR)
-	@echo "Compiling PARALLEL version..."
+	@echo "Compiling PARALLEL AND SEQUENTIAL versions..."
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAG) $^ -o $@ 
 
 # Regola per la compilazione della versione sequenziale (senza OpenMP)
@@ -28,7 +29,8 @@ $(BIN_DIR):
 # Esecuzione della versione parallela (Default: N=2)
 # Sintassi: make run NGRAM_SIZE=[2 o 3]
 run: $(BIN_DIR)/$(TARGET)_par
-	@./$(BIN_DIR)/$(TARGET)_par data/Texts $(NGRAM_SIZE)
+	@echo "Esecuzione test con NGRAM_SIZE=$(NGRAM_SIZE) e MAX_THREADS=$(NTHREADS)"
+	@./$(BIN_DIR)/$(TARGET)_par data/Texts $(NGRAM_SIZE) $(NTHREADS)
 
 # Esecuzione della versione sequenziale (Controllo)
 run_seq: $(BIN_DIR)/$(TARGET)_seq

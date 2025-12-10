@@ -6,17 +6,13 @@
 #include <unordered_map>
 
 using Histogram = std::unordered_map<std::string, long long>; 
+using DocumentCorpus = std::vector<std::vector<std::string>>;
 
-/**
- * Versione sequenziale dell'algoritmo di conteggio N-grammi.
- * Serve come baseline di performance.
- */
+
 Histogram count_sequential(const std::vector<std::string>& words, int n_gram_size);
 
-/**
- * Versione parallela dell'algoritmo di conteggio N-grammi (implementata con OpenMP).
- * Utilizzerà la strategia Thread-Local per alta scalabilità.
- */
 Histogram count_parallel(const std::vector<std::string>& words, int n_gram_size, int num_threads);
 
-#endif // NGRAM_LOGIC_H
+Histogram count_parallel_document_level(const DocumentCorpus& doc_words, int ngram_size, int num_threads);
+
+#endif
