@@ -9,18 +9,15 @@
 
 namespace fs = std::filesystem;
 
-std::vector<std::string> load_and_tokenize_directory(const std::string& dirname) {
+std::vector<std::string> load_and_tokenize_directory(const std::string& dirname, int multiplier) {
     std::vector<std::string> words;
     std::string full_text_buffer;
     
     fs::path dir_path(dirname);
 
     if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
-        std::cerr << "Errore: Il percorso '" << dirname << "' non è una directory valida o non esiste." << std::endl;
         return {};
     }
-
-    std::cout << "Inizio aggregazione file in: " << dirname << std::endl;
 
 
     for (const auto& entry : fs::directory_iterator(dir_path)) {
@@ -40,28 +37,42 @@ std::vector<std::string> load_and_tokenize_directory(const std::string& dirname)
     }
     
     if (full_text_buffer.empty()) {
-        std::cerr << "Attenzione: Nessun file .txt trovato nella directory " << dirname << std::endl;
+
         return {};
+    }
+
+    if (multiplier > 1) {
+        std::string original_text = full_text_buffer;
+
+        size_t original_size = original_text.length();
+
+        size_t required_size = original_size * (size_t)multiplier + (size_t)multiplier - 1;
+
+        try {
+            full_text_buffer.reserve(required_size); 
+        } catch (const std::bad_alloc& e) {
+            std::cerr << "ERRORE: Impossibile pre-allocare il buffer di testo per M = " << multiplier << std::endl;
+            return {};
+        }
+        
+        for (int i = 1; i < multiplier; ++i) { 
+            full_text_buffer += " " + original_text; 
+        }
     }
 
     words = tokenize_text(full_text_buffer);
 
-    std::cout << "Corpus caricato con " << words.size() << " parole." << std::endl;
-
     return words;
 }
 
-DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_path) {
+DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_path, int multiplier) {
     
     DocumentCorpus doc_corpus;
-    fs::path dir_path(directory_path);
 
-    std::cout << "Inizio caricamento del corpus a livello di documento da: " 
-              << directory_path << std::endl;
+    fs::path dir_path(directory_path);
 
     // Controllo di validità del percorso
     if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
-        std::cerr << "Errore: Il percorso '" << directory_path << "' non è una directory valida o non esiste." << std::endl;
         return {};
     }
 
@@ -74,7 +85,6 @@ DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_pa
                 // 1. Apertura e lettura del file in una singola stringa buffer
                 std::ifstream file(entry.path());
                 if (!file.is_open()) {
-                    std::cerr << "Attenzione: Impossibile aprire il file " << entry.path().filename() << ". Saltato." << std::endl;
                     continue;
                 }
                 
@@ -95,17 +105,26 @@ DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_pa
             }
         }
     } catch (const fs::filesystem_error& e) {
-        std::cerr << "Errore del file system durante il caricamento: " << e.what() << std::endl;
         return {}; 
     }
 
     if (doc_corpus.empty()) {
-        std::cerr << "Attenzione: Nessun documento valido (.txt) trovato per l'analisi." << std::endl;
-    } else {
-        std::cout << "Caricamento completato. Totale documenti separati nel corpus: " 
-                  << doc_corpus.size() << std::endl;
+        return {};
     }
-    
+    else
+    {
+        if (multiplier > 1) {
+
+            const DocumentCorpus original_base = doc_corpus;
+            doc_corpus.clear();
+
+            for (int i = 0; i < multiplier; ++i) {
+                DocumentCorpus corpus_base = doc_corpus;
+                doc_corpus.insert(doc_corpus.end(), original_base.begin(), original_base.end());
+            }
+        }
+    }
+
     return doc_corpus;
 }
 

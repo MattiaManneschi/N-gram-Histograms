@@ -1,6 +1,10 @@
 #include "ngram_logic.h"
 #include <omp.h>
-
+#include <iostream>
+#include <numeric>
+#include <algorithm>
+#include <vector>
+#include <functional>
 
 Histogram count_sequential(const std::vector<std::string>& words, int n_gram_size) {
     Histogram hist;
@@ -136,4 +140,70 @@ Histogram count_parallel_document_level(const DocumentCorpus& all_document_words
     }
     
     return final_hist;
+}
+
+Histogram count_parallel_critical_based(const std::vector<std::string>& words, int n_gram_size, int requested_threads){
+    if (words.size() < (size_t)n_gram_size) {
+        return {};
+    }
+
+    Histogram shared_hist;
+    size_t limit = words.size() - n_gram_size;
+
+    #pragma omp parallel num_threads(requested_threads) default(none) \
+        shared(words, n_gram_size, shared_hist, limit)
+    {
+        #pragma omp for schedule(static) nowait
+        for (size_t i = 0; i <= limit; ++i) { 
+            
+            std::string n_gram = words.at(i); 
+            for (int j = 1; j < n_gram_size; ++j) {
+                n_gram += " " + words.at(i+j); 
+            }
+            
+            #pragma omp critical
+            shared_hist[n_gram]++;
+        }
+    }
+
+    return shared_hist;
+
+}
+
+void print_corpus_statistics(const Histogram& hist, int n_gram_size, double total_time){
+    long long total_occurrences = 0;
+    
+    for (const auto& pair : hist) {
+        total_occurrences += pair.second;
+    }
+
+    size_t unique_ngrams = hist.size();
+    
+    std::cout << "\n==============================================" << std::endl;
+    std::cout << "Statistiche per " << n_gram_size << "-grammi" << std::endl;
+    std::cout << "==============================================" << std::endl;
+    std::cout << "Tempo di Esecuzione Totale (Ultimo Thread): " << total_time << "s" << std::endl;
+    std::cout << "Totale N-grammi (Occorrenze): " << total_occurrences << std::endl;
+    std::cout << "N-grammi Unici (Vocabolario): " << unique_ngrams << std::endl;
+    std::cout << "Rapporto Unici/Totali: " << (double)unique_ngrams / total_occurrences * 100.0 << "%" << std::endl;
+
+    // 2. Statistica "Top K" (Richiede ordinamento)
+    // Vettore di pair (frequenza, n-gramma)
+    std::vector<std::pair<long long, std::string>> sorted_ngrams;
+    for (const auto& pair : hist) {
+        // {conteggio, chiave} per ordinare per conteggio
+        sorted_ngrams.push_back({pair.second, pair.first}); 
+    }
+
+    // Ordina in ordine decrescente basato sul conteggio
+    std::sort(sorted_ngrams.rbegin(), sorted_ngrams.rend());
+    
+    // Stampa i Top 10
+    size_t k = 10;
+    std::cout << "\nTop " << k << " " << n_gram_size << "-grammi:" << std::endl;
+    for (size_t i = 0; i < k && i < sorted_ngrams.size(); ++i) {
+        std::cout << i + 1 << ". '" << sorted_ngrams[i].second 
+                  << "' -> " << sorted_ngrams[i].first << std::endl;
+    }
+    std::cout << "==============================================" << std::endl;
 }

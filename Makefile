@@ -9,6 +9,8 @@ SRC_DIR = src
 BIN_DIR = bin
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 NTHREADS ?= 16
+NGRAM_SIZE ?= 2
+DATA_DIR ?= data/Texts
 
 .PHONY: all seq par clean run run_seq
 
@@ -26,15 +28,10 @@ $(BIN_DIR)/$(TARGET)_seq: $(SRCS) | $(BIN_DIR)
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-# Esecuzione della versione parallela (Default: N=2)
-# Sintassi: make run NGRAM_SIZE=[2 o 3]
+# Esecuzione della versione parallela
 run: $(BIN_DIR)/$(TARGET)_par
-	@echo "Esecuzione test con NGRAM_SIZE=$(NGRAM_SIZE) e MAX_THREADS=$(NTHREADS)"
-	@./$(BIN_DIR)/$(TARGET)_par data/Texts $(NGRAM_SIZE) $(NTHREADS)
-
-# Esecuzione della versione sequenziale (Controllo)
-run_seq: $(BIN_DIR)/$(TARGET)_seq
-	@./$(BIN_DIR)/$(TARGET)_seq data/Texts ${NGRAM_SIZE:-2}
+	@echo "Esecuzione Parallela: NGRAM_SIZE=$(NGRAM_SIZE), NTHREADS=$(NTHREADS), MODE=$(TEST_MODE)"
+	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(TEST_MODE)
 
 clean:
 	rm -rf $(BIN_DIR)
