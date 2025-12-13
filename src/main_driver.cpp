@@ -9,6 +9,13 @@
 #include <type_traits>
 #include <iomanip>
 
+//TODO OTTIMIZZAZIONE CODICE
+//TODO UN SOLO TEST SEQUENZIALE PER THREAD SCALING
+//TODO M TEST SEQUENZIALI PER WORKLOAD SCALING (UNO SOLO PER OGNI MULTIPLIER) E POI AGGIUNGERE CONFRONTO
+//TODO SPOSTARE ESECUZIONE TEST SEQUENZIALE DIRETTAMENTE DENTRO LE FUNZIONI DI TEST
+//TODO DIVIDERE LE FUNZIONI DI TEST PER THREAD SCALING E WORKLOAD SCALING
+//TODO RINOMINARE LE FUNZIONI IN TAL SENSO
+
 template <typename CorpusType>
 void run_parallel_test(
     std::chrono::duration<double> duration_seq,
@@ -56,7 +63,7 @@ int main(const int argc, char* argv[]) {
     std::cout << "\n==============================================" << std::endl;
     std::cout << "\n--- Test Sequenziale ---" << std::endl;
     std::cout << "Tempo: " << duration_seq.count() << " secondi." << std::endl;
-    print_corpus_statistics(hist_seq, n_gram_size, duration_seq.count());
+    //print_corpus_statistics(hist_seq, n_gram_size, duration_seq.count());
 
     std::cout << "\n--- Test Parallelo ---" << std::endl;
 
@@ -70,7 +77,7 @@ int main(const int argc, char* argv[]) {
 
         run_parallel_test(duration_seq, words, n_gram_size, "Static-TLS", max_threads, &exporter);
         run_parallel_test(duration_seq, doc_words, n_gram_size, "Dynamic-TLS", max_threads, &exporter);
-        run_parallel_test(duration_seq, words, n_gram_size, "Coarse-grained", max_threads, &exporter);
+        //run_parallel_test(duration_seq, words, n_gram_size, "Coarse-grained", max_threads, &exporter);
         run_parallel_test(duration_seq, words, n_gram_size, "Fine-grained", max_threads, &exporter);
 
         // ✅ SALVATAGGIO FINALE
@@ -87,22 +94,22 @@ int main(const int argc, char* argv[]) {
         std::cout << "Esecuzione Test: Workload Scaling (Threads Fixed)" << std::endl;
         std::cout << "==============================================" << std::endl;
 
-        const int FIXED_THREAD = max_threads;
-        const std::vector<int> MULTIPLIER_STEPS = {1, 3, 5, 8, 10};
+        std::vector<int> MULTIPLIER_STEPS(10);
+        int val = 1;
+        for (auto& x : MULTIPLIER_STEPS) x=val, val+=1;
 
-        //run_workload_scaling_test(DATA_DIR, n_gram_size, FIXED_THREAD, MULTIPLIER_STEPS, "Static-TLS", &exporter);
-        //run_workload_scaling_test(DATA_DIR, n_gram_size, FIXED_THREAD, MULTIPLIER_STEPS, "Dynamic-TLS", &exporter);
+        run_workload_scaling_test(DATA_DIR, n_gram_size, max_threads, MULTIPLIER_STEPS, "Static-TLS", &exporter);
+        run_workload_scaling_test(DATA_DIR, n_gram_size, max_threads, MULTIPLIER_STEPS, "Dynamic-TLS", &exporter);
         //run_workload_scaling_test(DATA_DIR, n_gram_size, FIXED_THREAD, MULTIPLIER_STEPS, "Coarse-grained", &exporter);
-        run_workload_scaling_test(DATA_DIR, n_gram_size, FIXED_THREAD, MULTIPLIER_STEPS, "Fine-grained", &exporter);
+        run_workload_scaling_test(DATA_DIR, n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained", &exporter);
 
         // ✅ SALVATAGGIO FINALE
         std::cout << "\n==============================================" << std::endl;
-        std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(FIXED_THREAD) + ".csv";
-        std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(FIXED_THREAD) + "_summary.txt";
+        std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
+        std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
 
-        exporter.save_workload_results(csv_filename, n_gram_size, FIXED_THREAD);
+        exporter.save_workload_results(csv_filename, n_gram_size, max_threads);
         exporter.save_summary(txt_filename, n_gram_size);
-        std::cout << "💡 Tip: Usa 'make plot_workload' per generare i grafici" << std::endl;
     }
 
     return 0;

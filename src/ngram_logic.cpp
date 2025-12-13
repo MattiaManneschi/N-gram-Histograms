@@ -197,86 +197,49 @@ Histogram count_par_coarse_grained(const std::vector<std::string>& words, int n_
 
 Histogram count_par_fine_grained(const std::vector<std::string>& words, int n_gram_size, int num_threads)
 {
-    if (words.size() < static_cast<size_t>(n_gram_size)) {
+    if (words.size() < static_cast<size_t>(n_gram_size))
         return {};
-    }
 
-    Histogram shared_hist;
-    size_t limit = words.size() - n_gram_size;
+    const size_t limit = words.size() - n_gram_size;
 
-    // Array di lock - NUMERO PRIMO per migliore distribuzione hash
-    // Perché primo? Riduce collisioni con pattern periodici nei dati
-    constexpr int NUM_LOCKS = 1021;
-    std::vector<omp_lock_t> locks(NUM_LOCKS);
+    constexpr int NUM_SHARDS = 1024;
 
-    // Inizializza tutti i lock
-    for (int i = 0; i < NUM_LOCKS; ++i) {
-        omp_init_lock(&locks[i]);
-    }
+    std::vector<Histogram> shards(NUM_SHARDS);
+    std::vector<omp_lock_t> shard_locks(NUM_SHARDS);
+
+    for (auto& l : shard_locks)
+        omp_init_lock(&l);
 
     #pragma omp parallel num_threads(num_threads) default(none) \
-        shared(words, n_gram_size, shared_hist, limit, locks)
+    shared(words, n_gram_size, shards, shard_locks, limit)
     {
-        // BATCH PROCESSING LOCALE
-        // Ogni thread accumula n-grammi nel suo buffer privato
-        // per ridurre il numero di accessi alla mappa condivisa
-        std::unordered_map<std::string, long long> local_buffer;
-
-#pragma omp for schedule(static) nowait
+        #pragma omp for schedule(static)
         for (size_t i = 0; i <= limit; ++i) {
 
-            // Costruzione n-gramma (lavoro locale, no sync)
-            std::string n_gram = words.at(i);
-            for (int j = 1; j < n_gram_size; ++j) {
-                n_gram += " " + words.at(i+j);
-            }
+            std::string n_gram = words[i];
+            for (int j = 1; j < n_gram_size; ++j)
+                n_gram += " " + words[i + j];
 
-            // Accumula localmente (no lock necessario)
-            local_buffer[n_gram]++;
+            const size_t h = std::hash<std::string>{}(n_gram);
+            const size_t shard_id = h % NUM_SHARDS;
 
-            // FLUSH PERIODICO quando il buffer locale è pieno
-            if (constexpr size_t BATCH_SIZE = 10000; local_buffer.size() >= BATCH_SIZE) {
-
-                // Per ogni n-gramma nel buffer locale
-                for (const auto& [fst, snd] : local_buffer) {
-
-                    // LOCK STRIPING: Hash → Lock ID
-                    // Usa std::hash per ottenere un valore hash
-                    const size_t hash_val = std::hash<std::string>{}(fst);
-
-                    // Mappa hash a un lock specifico (modulo NUM_LOCKS)
-                    const int lock_id = hash_val % NUM_LOCKS;
-
-                    // CRITICAL REGION (ma solo per questo lock!)
-                    // Solo thread che vogliono aggiornare n-grammi con lo stesso
-                    // lock_id si bloccano a vicenda
-                    omp_set_lock(&locks[lock_id]);
-                    shared_hist[fst] += snd;
-                    omp_unset_lock(&locks[lock_id]);
-                }
-
-                // Svuota il buffer locale
-                local_buffer.clear();
-            }
-        }
-
-        // FLUSH FINALE: processa gli n-grammi rimanenti nel buffer
-        for (const auto& [fst, snd] : local_buffer) {
-            const size_t hash_val = std::hash<std::string>{}(fst);
-            const int lock_id = hash_val % NUM_LOCKS;
-
-            omp_set_lock(&locks[lock_id]);
-            shared_hist[fst] += snd;
-            omp_unset_lock(&locks[lock_id]);
+            omp_set_lock(&shard_locks[shard_id]);
+            shards[shard_id][n_gram]++;
+            omp_unset_lock(&shard_locks[shard_id]);
         }
     }
 
-    // CLEANUP: Distruggi tutti i lock
-    for (int i = 0; i < NUM_LOCKS; ++i) {
-        omp_destroy_lock(&locks[i]);
+    // Merge finale
+    Histogram final_hist;
+    for (auto& shard : shards) {
+        for (auto& [k, v] : shard)
+            final_hist[k] += v;
     }
 
-    return shared_hist;
+    for (auto& l : shard_locks)
+        omp_destroy_lock(&l);
+
+    return final_hist;
 }
 
 //stampa statistiche

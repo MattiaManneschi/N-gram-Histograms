@@ -31,31 +31,21 @@ $(BIN_DIR):
 run: $(BIN_DIR)/$(TARGET)_par
 	@echo "Esecuzione: NGRAM_SIZE=$(NGRAM_SIZE), NTHREADS=$(NTHREADS), MODE=$(MODE)"
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
+	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
 run_all: scaling workload
 
 scaling: $(BIN_DIR)/$(TARGET)_par
 	@echo "=== Running SCALING test ==="
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) SCALING
+	@echo "=== Generazione grafici scaling ==="
+	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
 workload: $(BIN_DIR)/$(TARGET)_par
 	@echo "=== Running WORKLOAD test ==="
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) WORKLOAD
-
-plot_scaling:
-	@echo "Generazione grafici scaling..."
-	python3 plot_results.py results/scaling_$(NGRAM_SIZE)gram.csv
-
-plot_workload:
-	@echo "Generazione grafici workload.."
-	python3 plot_results.py results/workload_$(NGRAM_SIZE)gram$(NTHREADS).csv
-
-plot_all:
-	@echo "Generazione di tutti i grafici.."
-	@for file in results/*.csv;
-	do @echo "Processing $$file...";
-	python3 plot_results.py $$file;
-	done
+	@echo "=== Generazione grafici workload ==="
+	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
 clean:
 	rm -rf $(BIN_DIR)

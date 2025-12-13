@@ -3,7 +3,6 @@
 
 #include <string>
 #include <vector>
-#include <fstream>
 
 struct BenchmarkResult {
     std::string strategy_name;
