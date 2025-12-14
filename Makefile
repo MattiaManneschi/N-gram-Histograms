@@ -11,9 +11,9 @@ SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 NTHREADS ?= 16
 NGRAM_SIZE ?= 2
 DATA_DIR ?= data/Texts
-MODE ?= SCALING
+MODE ?= THREAD
 
-.PHONY: all seq par clean run run_all scaling workload
+.PHONY: all seq par clean run run_all thread workload
 
 all: $(BIN_DIR)/$(TARGET)_par
 
@@ -33,11 +33,11 @@ run: $(BIN_DIR)/$(TARGET)_par
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
 	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
-run_all: scaling workload
+run_all: thread workload
 
-scaling: $(BIN_DIR)/$(TARGET)_par
+thread: $(BIN_DIR)/$(TARGET)_par
 	@echo "=== Running SCALING test ==="
-	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) SCALING
+	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) THREAD
 	@echo "=== Generazione grafici scaling ==="
 	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 

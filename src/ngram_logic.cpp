@@ -201,7 +201,6 @@ Histogram count_par_fine_grained(const std::vector<std::string>& words, int n_gr
         return {};
 
     const size_t limit = words.size() - n_gram_size;
-
     constexpr int NUM_SHARDS = 1024;
 
     std::vector<Histogram> shards(NUM_SHARDS);
