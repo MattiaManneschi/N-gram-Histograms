@@ -13,17 +13,15 @@ matplotlib.use('Agg')
 ngram_size = int(sys.argv[1])
 threads = int(sys.argv[2])
 
-scaling_csv = f"results/scaling_{ngram_size}gram.csv"
+scaling_csv = f"results/thread_scaling_{ngram_size}gram.csv"
 workload_csv = f"results/workload_{ngram_size}gram_t{threads}.csv"
 OUTPUT_DIR = "results"
 
 # Colori e marker per le strategie
 STRATEGY_STYLES = {
-    "Static-TLS":   {"color": "tab:blue",   "marker": "o", "linestyle": "-"},
-    "Dynamic-TLS":  {"color": "tab:purple",   "marker": "o", "linestyle": "dotted"},
-    "Coarse-grained":   {"color": "tab:orange", "marker": "s", "linestyle": "--"},
-    "Fine-grained": {"color": "tab:green",  "marker": "x", "linestyle": ":"},
-    "Seq":  {"color": "tab:red",    "marker": "d", "linestyle": "-."},
+    "Chunk-based-TLS":   {"color": "tab:blue",   "marker": "o", "linestyle": "-"},
+    "Document-level-TLS":  {"color": "tab:purple",   "marker": "o", "linestyle": "dotted"},
+    "Fine-grained-locking": {"color": "tab:green",  "marker": "x", "linestyle": ":"},
 }
 
 def plot_speedup(df, x_col, title, filename, x_label):
