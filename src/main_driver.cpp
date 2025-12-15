@@ -8,6 +8,7 @@
 #include <iomanip>
 
 //TODO OTTIMIZZARE SPEEDUP THREAD SCALING (UN PO TUTTE) E WORKLOAD SCALING (VERSIONE CHUNK-BASED)
+//TODO CONTROLLARE CHATGPT
 //TODO AGGIUNGERE DISTRIBUZIONI E STATISTICHE UTILI (VEDERE PDF O VECCHI PROGETTI)
 
 const std::string DATA_DIR = "data/Texts";
@@ -106,8 +107,8 @@ int main(const int argc, char* argv[]) {
 
         std::cout << "\n--- Test Parallelo ---\n" << std::endl;
 
-        //run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk-based-TLS", sequential_times, &exporter);
-        //run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document-level-TLS", sequential_times, &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk-based-TLS", sequential_times, &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document-level-TLS", sequential_times, &exporter);
         run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained-locking", sequential_times, &exporter);
 
         export_data(n_gram_size, max_threads, &exporter);
