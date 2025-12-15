@@ -6,8 +6,8 @@
 #include "ngram_counter.h"
 #include "results_exports.h"
 #include <iomanip>
-#include <numeric>
 
+//TODO OTTIMIZZARE SPEEDUP THREAD SCALING (UN PO TUTTE) E WORKLOAD SCALING (VERSIONE CHUNK-BASED)
 //TODO AGGIUNGERE DISTRIBUZIONI E STATISTICHE UTILI (VEDERE PDF O VECCHI PROGETTI)
 
 const std::string DATA_DIR = "data/Texts";
@@ -17,7 +17,7 @@ void run_thread_scaling_test(
     int n_gram_size,
     const std::string& strategy_name,
     int max_threads,
-    std::chrono::duration<double> duration_seq,
+    double sequential_time,
     ResultsExporter* exporter);
 
 void run_workload_scaling_test(
@@ -28,7 +28,9 @@ void run_workload_scaling_test(
     const std::vector<double>& sequential_times,
     ResultsExporter* exporter = nullptr);
 
-std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& MULTIPLIER_STEPS, const std::string& DATA_DIR, int n_gram_size);
+void export_data (int n_gram_size, int max_threads, const ResultsExporter* exporter);
+
+std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& MULTIPLIER_STEPS, int n_gram_size);
 
 int main(const int argc, char* argv[]) {
 
@@ -49,30 +51,19 @@ int main(const int argc, char* argv[]) {
     std::cout << "\nDati caricati da: " << DATA_DIR << std::endl;
     std::cout << "===========================================" << std::endl;
 
-
-
     ResultsExporter exporter("results");
 
     if (test_mode == "THREAD"){
         std::cout << "\n==============================================" << std::endl;
-        std::cout << "Esecuzione Test: Strong Scaling (Load Fixed)" << std::endl;
+        std::cout << "Esecuzione Test: Thread Scaling (Load Fixed)" << std::endl;
         std::cout << "==============================================" << std::endl;
 
-        const auto words = load_and_tokenize_directory(DATA_DIR);
-
-        if (words.empty())
-        {
-            std::cerr << "Errore: nessun dato caricato" << std::endl;
-            return 1;
-        }
-
-        std::cout << "\n--- Test Sequenziale (Baseline) ---" << std::endl;
+        std::cout << "\n--- Test Sequenziale ---" << std::endl;
 
         std::vector<double> sequential_times;
+        const auto words = load_and_tokenize_directory(DATA_DIR);
 
-        std::cout << "Calcolo tempo sequenzial medio....\n" << std::endl;
-
-        for (int i = 0; i < 10; i++)
+        /*for (int i = 0; i < 10; i++)
         {
             auto start_seq = std::chrono::high_resolution_clock::now();
             count_seq(words, n_gram_size);
@@ -82,52 +73,44 @@ int main(const int argc, char* argv[]) {
             std::cout << "I = " << i << " | T = " << duration_seq.count() << std::endl;
 
             sequential_times.push_back(duration_seq.count());
-        }
+        }*/
 
-        const double sequential_time = std::accumulate(sequential_times.begin(), sequential_times.end(), 0.0) / static_cast<double>(10);
+        //const double sequential_time = std::accumulate(sequential_times.begin(), sequential_times.end(), 0.0) / static_cast<double>(10);
+
+        constexpr double sequential_time = 6.25;
 
         std::cout << "\nTempo sequenziale medio: " << sequential_time << " secondi\n" << std::endl;
 
-        std::cout << "--- Test Paralleli --- \n" << std::endl;
+        std::cout << "--- Test Parallelo --- \n" << std::endl;
 
-        run_thread_scaling_test(n_gram_size, "Chunk-based-TLS", max_threads, std::chrono::duration<double>(sequential_time), &exporter);
-        run_thread_scaling_test(n_gram_size, "Document-level-TLS", max_threads, std::chrono::duration<double>(sequential_time), &exporter);
-        run_thread_scaling_test(n_gram_size, "Fine-grained-locking", max_threads, std::chrono::duration<double>(sequential_time), &exporter);
+        run_thread_scaling_test(n_gram_size, "Chunk-based-TLS", max_threads, sequential_time, &exporter);
+        run_thread_scaling_test(n_gram_size, "Document-level-TLS", max_threads, sequential_time, &exporter);
+        run_thread_scaling_test(n_gram_size, "Fine-grained-locking", max_threads, sequential_time, &exporter);
 
-        std::cout << "\n==============================================" << std::endl;
-        const std::string csv_filename = "thread_scaling_" + std::to_string(n_gram_size) + "gram.csv";
-        const std::string txt_filename = "thread_scaling_" + std::to_string(n_gram_size) + "gram_summary.txt";
-
-        exporter.save_scaling_results(csv_filename, n_gram_size);
-        exporter.save_summary(txt_filename, n_gram_size);
+        export_data(n_gram_size, max_threads, &exporter);
 
     } else if (test_mode == "WORKLOAD"){
         std::cout << "\n==============================================" << std::endl;
-        std::cout << "Esecuzione Test: Weak Scaling (Threads Fixed)" << std::endl;
+        std::cout << "Esecuzione Test: Workload Scaling (Threads Fixed)" << std::endl;
         std::cout << "==============================================" << std::endl;
 
         std::vector<int> MULTIPLIER_STEPS(10);
         int val = 1;
         for (auto& x : MULTIPLIER_STEPS) x=val, val+=1;
 
-        std::cout << "\n--- Test sequenziali ---\n" << std::endl;
+        std::cout << "\n--- Test sequenziale ---\n" << std::endl;
 
-        //const std::vector<double> sequential_times = get_sequential_times_per_multiplier(MULTIPLIER_STEPS, DATA_DIR, n_gram_size);
+        //const std::vector<double> sequential_times = get_sequential_times_per_multiplier(MULTIPLIER_STEPS, n_gram_size);
 
-        const std::vector<double> sequential_times = {5.92, 11.80, 15.91, 20.40, 26.36, 30.94, 36.96, 41.99, 44.34, 50.92};
+        const std::vector sequential_times = {5.93, 10.34, 15.03, 19.81, 24.27, 30.81, 36.84, 40.00, 45.98, 49.52};
 
-        std::cout << "\n--- Test Paralleli ---\n" << std::endl;
+        std::cout << "\n--- Test Parallelo ---\n" << std::endl;
 
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk-based-TLS", sequential_times, &exporter);
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document-level-TLS", sequential_times, &exporter);
+        //run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk-based-TLS", sequential_times, &exporter);
+        //run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document-level-TLS", sequential_times, &exporter);
         run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained-locking", sequential_times, &exporter);
 
-        std::cout << "\n==============================================" << std::endl;
-        const std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
-        const std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
-
-        exporter.save_workload_results(csv_filename, n_gram_size, max_threads);
-        exporter.save_summary(txt_filename, n_gram_size);
+        export_data(n_gram_size, max_threads, &exporter);
     } else
     {
         std::cerr << "Errore: test mode non riconosciuto. Usa THREAD o WORKLOAD ---\n" << std::endl;
@@ -140,24 +123,19 @@ void run_thread_scaling_test(
     const int n_gram_size,
     const std::string& strategy_name,
     const int max_threads,
-    const std::chrono::duration<double> duration_seq,
+    const double sequential_time,
     ResultsExporter* exporter)
 {
     std::cout << "Strategia: " << strategy_name << std::endl;
-
     for (int num_threads = 1; num_threads <= max_threads; ++num_threads){
-
-        Histogram hist_par;
-
         auto start_par = std::chrono::high_resolution_clock::now();
 
-
         if (strategy_name.find("Chunk-based-TLS") != std::string::npos) {
-            count_par_chunk_based_tls(DATA_DIR, n_gram_size, num_threads);
+            count_par_chunk_based_tls(DATA_DIR, n_gram_size, num_threads, 1);
         } else if (strategy_name.find("Document-level-TLS") != std::string::npos) {
-            count_par_document_level_tls(DATA_DIR, n_gram_size, num_threads);
+            count_par_document_level_tls(DATA_DIR, n_gram_size, num_threads, 1);
         } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
-            count_par_dynamic_locking(DATA_DIR, n_gram_size, num_threads);
+            count_par_fine_grained_locking(DATA_DIR, n_gram_size, num_threads, 1);
         } else {
             std::cerr << "  Errore: Strategia non riconosciuta" << std::endl;
             return;
@@ -165,13 +143,12 @@ void run_thread_scaling_test(
 
         auto end_par = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> duration_par = end_par - start_par;
-        const double speedup = duration_seq.count() / duration_par.count();
+        const double speedup = sequential_time / duration_par.count();
         const double efficiency = speedup / num_threads;
 
         std::cout << "T: " << num_threads
                   << " | Tempo: " << duration_par.count() << "s"
-                  << " | Speedup: " << speedup
-                  << " | Efficienza: " << (efficiency * 100.0) << "%" << std::endl;
+                  << " | Speedup: " << speedup << std::endl;
 
         if (exporter) {
             exporter->add_result(strategy_name, num_threads,
@@ -197,11 +174,11 @@ void run_workload_scaling_test(
         auto start_par = std::chrono::high_resolution_clock::now();
 
         if (strategy_name.find("Chunk-based-TLS") != std::string::npos) {
-            count_par_chunk_based_tls(DATA_DIR, n_gram_size, fixed_threads);
+            count_par_chunk_based_tls(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         } else if (strategy_name.find("Document-level-TLS") != std::string::npos) {
-            count_par_document_level_tls(DATA_DIR, n_gram_size, fixed_threads);
+            count_par_document_level_tls(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
-            count_par_dynamic_locking(DATA_DIR, n_gram_size, fixed_threads);
+            count_par_fine_grained_locking(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         } else {
             std::cerr << "  Errore: Strategia non riconosciuta" << std::endl;
             return;
@@ -215,9 +192,7 @@ void run_workload_scaling_test(
 
         std::cout << "M =" << std::setw(2) << multiplier
                   << " | T_par: " << std::fixed << std::setprecision(3) << parallel_time << "s"
-                  << " | Speedup: " << std::setprecision(2) << speedup
-                  << " | Efficienza: " << std::fixed << std::setprecision(2) << efficiency << "%"
-                  << std::endl;
+                  << " | Speedup: " << std::setprecision(2) << speedup << std::endl;
 
         if (exporter) {
             exporter->add_result(strategy_name, fixed_threads,
@@ -228,7 +203,7 @@ void run_workload_scaling_test(
     std::cout << std::endl;
 }
 
-std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& MULTIPLIER_STEPS, const std::string& DATA_DIR, int n_gram_size)
+std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& MULTIPLIER_STEPS, const int n_gram_size)
 {
     std::vector<double> sequential_times;
 
@@ -260,4 +235,15 @@ std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& 
     }
 
     return sequential_times;
+}
+
+
+void export_data(const int n_gram_size, const int max_threads, const ResultsExporter* exporter)
+{
+    std::cout << "\n==============================================" << std::endl;
+    const std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
+    const std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
+
+    exporter->save_workload_results(csv_filename, n_gram_size, max_threads);
+    exporter->save_summary(txt_filename, n_gram_size);
 }
