@@ -2,8 +2,8 @@
 #include <fstream>
 #include <chrono>
 #include <algorithm>
-#include "text_processor.h"
-#include "ngram_logic.h"
+#include "data_loader.h"
+#include "ngram_counter.h"
 #include "results_exports.h"
 #include <type_traits>
 #include <iomanip>

@@ -1,4 +1,4 @@
-#include "ngram_logic.h"
+#include "ngram_counter.h"
 #include <omp.h>
 #include <iostream>
 #include <algorithm>
