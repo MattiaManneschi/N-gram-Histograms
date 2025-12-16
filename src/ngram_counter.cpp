@@ -1,6 +1,5 @@
 #include "ngram_counter.h"
 #include <omp.h>
-#include <iostream>
 #include <algorithm>
 #include <vector>
 #include <functional>
@@ -13,6 +12,7 @@
 #include <iterator>
 
 namespace fs = std::filesystem;
+
 
 // Sequenziale
 
@@ -121,7 +121,6 @@ Histogram count_par_chunk_based_tls(const std::string& directory_path, int n_gra
 }
 Histogram count_par_document_level_tls(const std::string& directory_path, int ngram_size, int num_threads, int multiplier) {
 
-    namespace fs = std::filesystem;
     std::vector<fs::path> file_paths;
     fs::path dir_path(directory_path);
 
@@ -308,3 +307,77 @@ Histogram count_par_fine_grained_locking(const std::string& directory_path, int 
 
     return final_hist;
 }
+
+void createHistogramV3(Histogram& hist, int n_gram_size, int max_iter){
+
+    // Count the texts in the folder
+    int doc_count = 0;
+    for ([[maybe_unused]] const auto &document: std::filesystem::directory_iterator("data/Texts")) {
+        doc_count++;
+    }
+
+#pragma omp parallel shared(doc_count, max_iter, n_gram_size, hist) default(none)
+    {
+        // Create the local version of the histograms and the local set of texts
+        std::vector<std::string> texts;
+        Histogram thread_word_histogram;
+
+        // Iterate over the text folder
+        for (int k=0;k< max_iter;k++) {
+#pragma omp for nowait schedule(dynamic,1)
+            for (int i = 0; i < doc_count; i++) {
+
+                // Obtain the path of the next file
+                std::string document_path ="data/Texts/" + std::to_string(i) + ".txt";
+
+                // Open the file, extract the text and close the file
+                if (std::ifstream file(document_path); file.is_open()) {
+
+                    std::stringstream buffer;
+                    buffer << file.rdbuf();
+                    std::string content = buffer.str();
+                    texts.push_back(content);
+
+                    file.close();
+                } else {
+                    printf("Impossible open the file: %s", document_path.c_str());
+                }
+            }
+        }
+        // Update the local histograms using the local set of texts
+        for (size_t l = 0; l < texts.size(); l++) {
+            UpdateHistogramWord(thread_word_histogram, texts[l], n_gram_size);
+        }
+
+#pragma omp critical (word)
+        {
+            for (const auto & [fst, snd]: thread_word_histogram) {
+                hist[fst] += snd;
+            }
+        }
+
+    }// end parallel section
+}
+void UpdateHistogramWord(Histogram& hist, const std::string& text, const int n_gram_size) {
+    std::istringstream stream(text);
+
+    if (const std::vector<std::string> words((std::istream_iterator<std::string>(stream)), {}); words.size() > static_cast<size_t>(n_gram_size)) {
+        // Usa size_t invece di int per l'indice
+        for (size_t i = 0; i <= words.size() - static_cast<size_t>(n_gram_size); ++i) {
+            std::string word_string;
+            for (size_t j = i; j < i + static_cast<size_t>(n_gram_size) - 1; ++j) {
+                word_string += words[j] + " ";
+            }
+            word_string += words[i + n_gram_size - 1];
+
+            for (char &ch: word_string) ch = std::tolower(ch);
+
+            word_string.erase(std::remove_if(word_string.begin(), word_string.end(),
+                                             [](const char ch) { return !std::isalpha(ch) && ch != ' '; }),
+                              word_string.end());
+
+            hist[word_string]++;
+        }
+    }
+}
+
