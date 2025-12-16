@@ -10,10 +10,10 @@
 #include <omp.h>
 
 //TODO AGGIUNGERE DISTRIBUZIONI E STATISTICHE UTILI (VEDERE PDF O VECCHI PROGETTI)
-//TODO TESTARE LE FUNZIONI PER THREAD SCALING E WORKLOAD SCALING E VEDERE SE È POSSIBILE FARE DEI MIGLIORAMENTI
+//TODO OTTIMIZZARE WORKLOAD SCALING (DOCUMENT-LEVEL)
 
 const std::string DATA_DIR = "data/Texts";
-constexpr int TEST_ITER = 20;
+constexpr int TEST_ITER = 1;
 
 
 void run_thread_scaling_test(
@@ -35,13 +35,7 @@ std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& 
 
 int main(const int argc, char* argv[]) {
 
-    if (argc < 5) {
-        std::cerr << "Uso: " << argv[0] << " <directory> <n_gram_size> <max_threads> <test_mode>" << std::endl;
-        std::cerr << "test_mode: SCALING o WORKLOAD" << std::endl;
-        return 1;
-    }
-
-    int n_gram_size = std::stoi(argv[2]);
+    const int n_gram_size = std::stoi(argv[2]);
     const int max_threads = std::stoi(argv[3]);
     std::string test_mode = argv[4];
 
@@ -85,14 +79,14 @@ int main(const int argc, char* argv[]) {
         std::cout << "--- Test Parallelo --- \n" << std::endl;
 
         run_thread_scaling_test(n_gram_size, "Hybrid-TLS" , max_threads, sequential_time, &exporter);
-        run_thread_scaling_test(n_gram_size, "Document-level-TLS" , max_threads, sequential_time, &exporter);
-        run_thread_scaling_test(n_gram_size, "Fine-grained-locking" , max_threads, sequential_time, &exporter);
+        run_thread_scaling_test(n_gram_size, "Single Reader" , max_threads, sequential_time, &exporter);
+        run_thread_scaling_test(n_gram_size, "On the Fly" , max_threads, sequential_time, &exporter);
 
         std::cout << "\n==============================================" << std::endl;
-        const std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
-        const std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
+        const std::string csv_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
+        const std::string txt_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
 
-        exporter.save_workload_results(csv_filename, n_gram_size, max_threads);
+        exporter.save_scaling_results(csv_filename, n_gram_size);
         exporter.save_summary(txt_filename, n_gram_size);
 
     } else if (test_mode == "WORKLOAD"){
@@ -122,9 +116,6 @@ int main(const int argc, char* argv[]) {
 
         exporter.save_workload_results(csv_filename, n_gram_size, max_threads);
         exporter.save_summary(txt_filename, n_gram_size);
-    } else
-    {
-        std::cerr << "Errore: test mode non riconosciuto. Usa THREAD o WORKLOAD ---\n" << std::endl;
     }
 
     return 0;
@@ -137,27 +128,27 @@ void run_thread_scaling_test(
     const double sequential_time,
     ResultsExporter* exporter)
 {
+    std::cout << "Strategia: " << strategy_name << " (Threads=" << max_threads << ")" << std::endl;
+
+    Histogram hist;
+
     for (int num_threads = 1; num_threads <= max_threads; ++num_threads){
         omp_set_num_threads(num_threads);
         std::vector<double> par_times;
+
         for ( int i = 0; i < TEST_ITER; i++)
         {
-            std::cout << "TH: " << num_threads << " | TEST: " << i+1 << std::endl;
-            const auto start_par = std::chrono::high_resolution_clock::now();
+            const auto start_par = omp_get_wtime();
             if (strategy_name.find("Hybrid-TLS") != std::string::npos) {
-                Histogram hist;
-                createHistogramV3(hist, n_gram_size);
-            } else if (strategy_name.find("Document-level-TLS") != std::string::npos) {
-                count_par_document_level_tls(DATA_DIR, n_gram_size, num_threads, 1);
-            } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
-                count_par_fine_grained_locking(DATA_DIR, n_gram_size, num_threads, 1);
-            } else {
-                std::cerr << "  Errore: Strategia non riconosciuta" << std::endl;
-                return;
+                count_par_hybrid_preload_TLS(hist, n_gram_size);
+            } else if (strategy_name.find("Single Reader") != std::string::npos) {
+                count_par_singleReader_Worker_TLS(hist, n_gram_size);
+            } else if (strategy_name.find("On the Fly") != std::string::npos) {
+                count_par_onTheFly_parallelIO(hist, n_gram_size);
             }
-            auto end_par = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> duration_par = end_par - start_par;
-            par_times.push_back(duration_par.count());
+            const auto end_par = omp_get_wtime();
+            const auto duration_par = end_par - start_par;
+            par_times.push_back(duration_par);
         }
 
         const double duration_par = std::accumulate(par_times.begin(), par_times.end(), 0.0) / par_times.size();
@@ -165,13 +156,13 @@ void run_thread_scaling_test(
         const double speedup = sequential_time / duration_par;
         const double efficiency = speedup / num_threads;
 
-        std::cout << "\nTH: " << num_threads
+        std::cout << "TH: " << num_threads
                   << " | N.TEST: " << TEST_ITER
                   << " | Tempo medio: " << duration_par << "s"
-                  << " | Speedup medio: " << speedup << "\n" << std::endl;
+                  << " | Speedup medio: " << speedup << std::endl;
 
         if (exporter) {
-            exporter->add_result("Hybrid-TLS", num_threads,
+            exporter->add_result(strategy_name, num_threads,
                                duration_par, speedup, efficiency);
         }
     }
@@ -191,33 +182,30 @@ void run_workload_scaling_test(
         const int multiplier = multiplier_steps[i];
         const double sequential_time = sequential_times[i];
 
-        auto start_par = std::chrono::high_resolution_clock::now();
+        const auto start_par = omp_get_wtime();
 
         if (strategy_name.find("Hybrid-TLS") != std::string::npos) {
             Histogram hist;
-            createHistogramV3(hist,n_gram_size, multiplier);
+            count_par_singleReader_Worker_TLS(hist,n_gram_size, multiplier);
         } else if (strategy_name.find("Document-level-TLS") != std::string::npos) {
             count_par_document_level_tls(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
             count_par_fine_grained_locking(DATA_DIR, n_gram_size, fixed_threads, multiplier);
-        } else {
-            std::cerr << "  Errore: Strategia non riconosciuta" << std::endl;
-            return;
         }
 
-        auto end_par = std::chrono::high_resolution_clock::now();
-        const double parallel_time = std::chrono::duration<double>(end_par - start_par).count();
+        const auto end_par = omp_get_wtime();
+        const auto duration_par = end_par - start_par;
 
-        const double speedup = sequential_time / parallel_time;
+        const double speedup = sequential_time / duration_par;
         const double efficiency = (speedup / fixed_threads) * 100.0;
 
         std::cout << "M =" << std::setw(2) << multiplier
-                  << " | T_par: " << std::fixed << std::setprecision(3) << parallel_time << "s"
+                  << " | T_par: " << std::fixed << std::setprecision(3) << duration_par << "s"
                   << " | Speedup: " << std::setprecision(2) << speedup << std::endl;
 
         if (exporter) {
             exporter->add_result(strategy_name, fixed_threads,
-                               parallel_time, speedup, efficiency / 100.0, multiplier);
+                               duration_par, speedup, efficiency / 100.0, multiplier);
         }
     }
 

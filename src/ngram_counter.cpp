@@ -32,200 +32,210 @@ Histogram count_seq(const std::vector<std::string>& words, const int n_gram_size
 
 // Parallelo
 
-Histogram count_par_chunk_based_tls(const std::string& directory_path, int n_gram_size, int num_threads, int multiplier)
+void count_par_singleReader_Worker_TLS(Histogram& hist, int n_gram_size, int max_iter)
 {
-    namespace fs = std::filesystem;
-    std::vector<fs::path> file_paths;
-    fs::path dir_path(directory_path);
+     std::vector<std::string> texts;
 
-    if (!fs::exists(dir_path) || !fs::is_directory(dir_path))
-        return {};
-
-    for (const auto& entry : fs::directory_iterator(dir_path)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".txt") {
-            file_paths.push_back(entry.path());
-        }
-    }
-    if (file_paths.empty()) return {};
-
-    const size_t doc_count = file_paths.size();
-    std::vector<std::vector<std::string>> tokenized_docs(doc_count);
-
-    #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
-    for (size_t i = 0; i < doc_count; ++i) {
-        std::ifstream file(file_paths[i]);
-        if (!file.is_open()) continue;
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
-        file.close();
-
-        tokenized_docs[i] = tokenize_text(content);
-    }
-
-    size_t total_words_count = 0;
-    for (const auto& doc_words : tokenized_docs)
-        total_words_count += doc_words.size();
-
-    std::vector<std::string> final_words;
-    final_words.reserve(total_words_count);
-    for (auto& doc_words : tokenized_docs) {
-        final_words.insert(final_words.end(),
-                           std::make_move_iterator(doc_words.begin()),
-                           std::make_move_iterator(doc_words.end()));
-        doc_words.clear();
-        doc_words.shrink_to_fit();
-    }
-    tokenized_docs.clear();
-
-    if (final_words.size() < static_cast<size_t>(n_gram_size)) return {};
-
-    std::vector<std::string> final_words_scaled;
-    final_words_scaled.reserve(final_words.size() * multiplier);
-    for (int m = 0; m < multiplier; ++m) {
-        final_words_scaled.insert(final_words_scaled.end(),
-                                  final_words.begin(),
-                                  final_words.end());
-    }
-
-    std::vector<Histogram> local_hists(num_threads);
-    const int CHUNK_SIZE = 10000;
-    const size_t limit = final_words_scaled.size() - n_gram_size;
-
-    #pragma omp parallel num_threads(num_threads) default(none) \
-        shared(final_words_scaled, n_gram_size, local_hists, limit, CHUNK_SIZE)
+#pragma omp parallel shared(texts, max_iter, n_gram_size, hist) default(none)
     {
-        int tid = omp_get_thread_num();
-        Histogram& my_hist = local_hists[tid];
+         Histogram thread_word_hist;
 
-        #pragma omp for schedule(static, CHUNK_SIZE) nowait
-        for (size_t i = 0; i <= limit; ++i) {
-            std::string n_gram = final_words_scaled[i];
-            for (int j = 1; j < n_gram_size; ++j)
-                n_gram += " " + final_words_scaled[i + j];
-            my_hist[n_gram]++;
+        // Iterate over the texts
+        for (int k=0;k<max_iter;k++) {
+            for (const auto &document: std::filesystem::directory_iterator("data/Texts")) {
+
+                // Obtain the path of the next file
+                std::string document_path = document.path().string();
+                std::ifstream file(document_path);
+
+                #pragma omp single
+                {   // Open the file and read the document
+                    if (file.is_open()) {
+                        std::string content;
+
+                        std::string line;
+                        std::stringstream buffer;
+
+                        buffer << file.rdbuf();
+                        content = buffer.str();
+                        texts.push_back(content);
+
+                        file.close();
+                    }
+                    else {
+                        printf("Impossible open the file: %s", document_path.c_str());
+                    }
+                }
+            }
         }
-    }
 
-    Histogram final_hist;
-    size_t total_unique_elements = 0;
-    for (const auto& hist : local_hists) total_unique_elements += hist.size();
-    final_hist.reserve(total_unique_elements);
+#pragma omp for nowait schedule(dynamic,1)
+        for (auto & text : texts) {
+            UpdateHistogramWord(thread_word_hist, text, n_gram_size);
+        }
 
-    for (const auto& hist : local_hists)
-        for (const auto& [key, count] : hist)
-            final_hist[key] += count;
 
-    return final_hist;
+#pragma omp critical (word)
+        {
+            for (const auto & [fst, snd]: thread_word_hist) {
+                hist[fst] += snd;
+            }
+        }
+
+   }
 }
+
+void count_par_onTheFly_parallelIO(Histogram& hist,const int n_gram_size, int max_iter){
+
+    // Count the number of texts in the folder
+    int doc_count = 0;
+    for ([[maybe_unused]] const auto &document: std::filesystem::directory_iterator("data/Texts")) {
+        doc_count++;
+    }
+
+    # pragma omp parallel shared(doc_count, max_iter, n_gram_size, hist) default(none)
+    {
+        Histogram thread_word_histogram;
+
+        for (int k=0; k < max_iter; k++) {
+            # pragma omp for nowait schedule(dynamic,1)
+            for (int i = 0; i < doc_count; i++) {
+
+                std::string document_path = "data/Texts/" + std::to_string(i) + ".txt";
+
+                if (std::ifstream file(document_path); file.is_open()) {
+
+                    std::stringstream buffer;
+                    buffer << file.rdbuf();
+                    std::string content = buffer.str();
+
+                    UpdateHistogramWord(thread_word_histogram, content, n_gram_size);
+
+                    file.close();
+                } else {
+                    printf("Impossible open the file: %s", document_path.c_str());
+                }
+            }
+        }
+
+        #pragma omp critical (word)
+        {
+            for (const auto & [fst, snd]: thread_word_histogram) {
+                hist[fst] += snd;
+            }
+        }
+
+    }
+}
+
+void count_par_hybrid_preload_TLS(Histogram& hist, int n_gram_size, int max_iter){
+
+    int doc_count = 0;
+    for ([[maybe_unused]] const auto &document: std::filesystem::directory_iterator("data/Texts")) {
+        doc_count++;
+    }
+
+#pragma omp parallel shared(doc_count, max_iter, n_gram_size, hist) default(none)
+    {
+        std::vector<std::string> texts;
+        Histogram thread_word_histogram;
+
+        for (int k=0;k< max_iter;k++) {
+#pragma omp for nowait schedule(dynamic,1)
+            for (int i = 0; i < doc_count; i++) {
+                std::string document_path ="data/Texts/" + std::to_string(i) + ".txt";
+
+                if (std::ifstream file(document_path); file.is_open()) {
+
+                    std::stringstream buffer;
+                    buffer << file.rdbuf();
+                    std::string content = buffer.str();
+                    texts.push_back(content);
+
+                    file.close();
+                } else {
+                    printf("Impossible open the file: %s", document_path.c_str());
+                }
+            }
+        }
+        for (size_t l = 0; l < texts.size(); l++) {
+            UpdateHistogramWord(thread_word_histogram, texts[l], n_gram_size);
+        }
+
+#pragma omp critical (word)
+        {
+            for (const auto & [fst, snd]: thread_word_histogram) {
+                hist[fst] += snd;
+            }
+        }
+
+    }
+}
+
 Histogram count_par_document_level_tls(const std::string& directory_path, int ngram_size, int num_threads, int multiplier) {
+    std::vector<std::vector<std::string>> base_docs;
 
-    std::vector<fs::path> file_paths;
-    fs::path dir_path(directory_path);
-
-    if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
-        return {};
-    }
-
-    for (const auto& entry : fs::directory_iterator(dir_path)) {
+    for (const auto& entry : fs::directory_iterator(directory_path)) {
         if (entry.is_regular_file() && entry.path().extension() == ".txt") {
-            file_paths.push_back(entry.path());
+            std::ifstream file(entry.path());
+            if (!file.is_open()) continue;
+
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+            base_docs.push_back(tokenize_text(buffer.str()));
         }
     }
 
-    if (file_paths.empty()) return {};
+    if (base_docs.empty()) return {};
 
-    const size_t doc_count = file_paths.size();
-
-    std::vector<std::vector<std::string>> tokenized_docs(doc_count);
-    for (size_t i = 0; i < doc_count; ++i) {
-        std::ifstream file(file_paths[i]);
-        if (!file.is_open()) continue;
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
-        file.close();
-
-        tokenized_docs[i] = tokenize_text(content);
-    }
-
-    std::vector<std::string> all_words;
-    size_t total_words = 0;
-    for (int m = 0; m < multiplier; ++m) {
-        for (const auto& doc_words : tokenized_docs) {
-            total_words += doc_words.size();
-        }
-    }
-    all_words.reserve(total_words);
+    std::vector<std::vector<std::string>> scaled_docs;
+    scaled_docs.reserve(base_docs.size() * multiplier);
 
     for (int m = 0; m < multiplier; ++m) {
-        for (const auto& doc_words : tokenized_docs) {
-            all_words.insert(all_words.end(), doc_words.begin(), doc_words.end());
+        for (const auto& doc : base_docs) {
+            scaled_docs.push_back(doc);
         }
     }
-
-    if (all_words.size() < static_cast<size_t>(ngram_size)) return {};
 
     std::vector<Histogram> local_hists(num_threads);
 
     #pragma omp parallel num_threads(num_threads) default(none) \
-        shared(doc_count, ngram_size, local_hists, file_paths)
+        shared(scaled_docs, ngram_size, local_hists)
     {
         int tid = omp_get_thread_num();
         Histogram& my_hist = local_hists[tid];
 
         #pragma omp for schedule(dynamic)
-        for (size_t i = 0; i < doc_count; ++i) {
-
-            const fs::path& current_path = file_paths[i];
-
-            std::ifstream file(current_path);
-            if (!file.is_open()) continue;
-
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            std::string content = buffer.str();
-            file.close();
-
-            const std::vector<std::string> words = tokenize_text(content);
-
+        for (const auto & words : scaled_docs) {
             if (words.size() < static_cast<size_t>(ngram_size)) continue;
 
             const size_t limit = words.size() - ngram_size;
-
             for (size_t k = 0; k <= limit; ++k) {
-
-                std::string n_gram = words.at(k);
-
+                std::string n_gram = words[k];
                 for (int j = 1; j < ngram_size; ++j) {
-                    n_gram += " " + words.at(k+j);
+                    n_gram += " " + words[k + j];
                 }
-
                 my_hist[n_gram]++;
             }
         }
     }
 
     Histogram final_hist;
-    size_t total_unique_elements = 0;
+    size_t total_unique = 0;
+    for (const auto& h : local_hists) total_unique += h.size();
+    final_hist.reserve(total_unique / 2);
 
-    for (const auto& current_hist : local_hists) {
-        total_unique_elements += current_hist.size();
-    }
-    final_hist.reserve(total_unique_elements);
-
-    for (const auto& current_hist : local_hists) {
-        for (const auto& [fst, snd] : current_hist) {
-            final_hist[fst] += snd;
+    for (const auto& h : local_hists) {
+        for (const auto& [key, val] : h) {
+            final_hist[key] += val;
         }
     }
-    
+
     return final_hist;
 }
+
 Histogram count_par_fine_grained_locking(const std::string& directory_path, int n_gram_size, int num_threads, int multiplier)
 {
-    namespace fs = std::filesystem;
     std::vector<fs::path> file_paths;
     fs::path dir_path(directory_path);
 
@@ -308,61 +318,10 @@ Histogram count_par_fine_grained_locking(const std::string& directory_path, int 
     return final_hist;
 }
 
-void createHistogramV3(Histogram& hist, int n_gram_size, int max_iter){
-
-    // Count the texts in the folder
-    int doc_count = 0;
-    for ([[maybe_unused]] const auto &document: std::filesystem::directory_iterator("data/Texts")) {
-        doc_count++;
-    }
-
-#pragma omp parallel shared(doc_count, max_iter, n_gram_size, hist) default(none)
-    {
-        // Create the local version of the histograms and the local set of texts
-        std::vector<std::string> texts;
-        Histogram thread_word_histogram;
-
-        // Iterate over the text folder
-        for (int k=0;k< max_iter;k++) {
-#pragma omp for nowait schedule(dynamic,1)
-            for (int i = 0; i < doc_count; i++) {
-
-                // Obtain the path of the next file
-                std::string document_path ="data/Texts/" + std::to_string(i) + ".txt";
-
-                // Open the file, extract the text and close the file
-                if (std::ifstream file(document_path); file.is_open()) {
-
-                    std::stringstream buffer;
-                    buffer << file.rdbuf();
-                    std::string content = buffer.str();
-                    texts.push_back(content);
-
-                    file.close();
-                } else {
-                    printf("Impossible open the file: %s", document_path.c_str());
-                }
-            }
-        }
-        // Update the local histograms using the local set of texts
-        for (size_t l = 0; l < texts.size(); l++) {
-            UpdateHistogramWord(thread_word_histogram, texts[l], n_gram_size);
-        }
-
-#pragma omp critical (word)
-        {
-            for (const auto & [fst, snd]: thread_word_histogram) {
-                hist[fst] += snd;
-            }
-        }
-
-    }// end parallel section
-}
 void UpdateHistogramWord(Histogram& hist, const std::string& text, const int n_gram_size) {
     std::istringstream stream(text);
 
     if (const std::vector<std::string> words((std::istream_iterator<std::string>(stream)), {}); words.size() > static_cast<size_t>(n_gram_size)) {
-        // Usa size_t invece di int per l'indice
         for (size_t i = 0; i <= words.size() - static_cast<size_t>(n_gram_size); ++i) {
             std::string word_string;
             for (size_t j = i; j < i + static_cast<size_t>(n_gram_size) - 1; ++j) {

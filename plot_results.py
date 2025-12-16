@@ -13,15 +13,17 @@ matplotlib.use('Agg')
 ngram_size = int(sys.argv[1])
 threads = int(sys.argv[2])
 
-scaling_csv = f"results/thread_scaling_{ngram_size}gram.csv"
+scaling_csv = f"results/thread_{ngram_size}gram_t{threads}.csv"
 workload_csv = f"results/workload_{ngram_size}gram_t{threads}.csv"
 OUTPUT_DIR = "results"
 
 # Colori e marker per le strategie
 STRATEGY_STYLES = {
     "Hybrid-TLS":   {"color": "tab:blue",   "marker": "o", "linestyle": "-"},
-    "Document-level-TLS":  {"color": "tab:purple",   "marker": "o", "linestyle": "dotted"},
-    "Fine-grained-locking": {"color": "tab:green",  "marker": "x", "linestyle": ":"},
+    "Document-level-TLS":  {"color": "tab:purple",   "marker": "x", "linestyle": "dotted"},
+    "Fine-grained-locking": {"color": "tab:green",  "marker": "o", "linestyle": ":"},
+    "Single Reader": {"color": "tab:orange", "marker": "o", "linestyle": "-"},
+    "On the Fly": {"color": "tab:red", "marker": "x", "linestyle": "dotted"},
 }
 
 def plot_speedup(df, x_col, title, filename, x_label):
@@ -63,7 +65,6 @@ else:
 
 if os.path.exists(workload_csv):
     df_workload = pd.read_csv(workload_csv)
-    # Non filtriamo più per fixed threads
     plot_speedup(df_workload, x_col='Multiplier',
                  title='Workload Test: Speedup vs Workload',
                  filename='workload_speedup.png',

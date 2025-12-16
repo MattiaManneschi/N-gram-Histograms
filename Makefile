@@ -36,13 +36,13 @@ run: $(BIN_DIR)/$(TARGET)_par
 run_all: thread workload
 
 thread: $(BIN_DIR)/$(TARGET)_par
-	@echo "=== Running SCALING test ==="
+	@echo "=== Running THREAD SCALING test ==="
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) THREAD
 	@echo "=== Generazione grafici scaling ==="
 	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
 workload: $(BIN_DIR)/$(TARGET)_par
-	@echo "=== Running WORKLOAD test ==="
+	@echo "=== Running WORKLOAD SCALING test ==="
 	./$(BIN_DIR)/$(TARGET)_par $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) WORKLOAD
 	@echo "=== Generazione grafici workload ==="
 	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
