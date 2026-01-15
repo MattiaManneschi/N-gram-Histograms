@@ -9,9 +9,6 @@
 #include <numeric>
 #include <omp.h>
 
-//TODO AGGIUNGERE DISTRIBUZIONI E STATISTICHE UTILI (VEDERE PDF O VECCHI PROGETTI)
-//TODO OTTIMIZZARE WORKLOAD SCALING (DOCUMENT-LEVEL)
-
 const std::string DATA_DIR = "data/Texts";
 constexpr int TEST_ITER = 1;
 
@@ -106,8 +103,8 @@ int main(const int argc, char* argv[]) {
 
         std::cout << "\n--- Test Parallelo ---\n" << std::endl;
 
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Hybrid-TLS", sequential_times, &exporter);
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document-level-TLS", sequential_times, &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk based", sequential_times, &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document Level", sequential_times, &exporter);
         run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained-locking", sequential_times, &exporter);
 
         std::cout << "\n==============================================" << std::endl;
@@ -130,8 +127,6 @@ void run_thread_scaling_test(
 {
     std::cout << "Strategia: " << strategy_name << " (Threads=" << max_threads << ")" << std::endl;
 
-    Histogram hist;
-
     for (int num_threads = 1; num_threads <= max_threads; ++num_threads){
         omp_set_num_threads(num_threads);
         std::vector<double> par_times;
@@ -140,11 +135,11 @@ void run_thread_scaling_test(
         {
             const auto start_par = omp_get_wtime();
             if (strategy_name.find("Hybrid-TLS") != std::string::npos) {
-                count_par_hybrid_preload_TLS(hist, n_gram_size);
+                count_par_hybrid_preload_TLS(n_gram_size);
             } else if (strategy_name.find("Single Reader") != std::string::npos) {
-                count_par_singleReader_Worker_TLS(hist, n_gram_size);
+                count_par_singleReader_Worker_TLS(n_gram_size);
             } else if (strategy_name.find("On the Fly") != std::string::npos) {
-                count_par_onTheFly_parallelIO(hist, n_gram_size);
+                count_par_onTheFly_parallelIO(n_gram_size);
             }
             const auto end_par = omp_get_wtime();
             const auto duration_par = end_par - start_par;
@@ -184,10 +179,9 @@ void run_workload_scaling_test(
 
         const auto start_par = omp_get_wtime();
 
-        if (strategy_name.find("Hybrid-TLS") != std::string::npos) {
-            Histogram hist;
-            count_par_singleReader_Worker_TLS(hist,n_gram_size, multiplier);
-        } else if (strategy_name.find("Document-level-TLS") != std::string::npos) {
+        if (strategy_name.find("Chunk based") != std::string::npos) {
+            count_par_chunk_based_adaptive(DATA_DIR,n_gram_size, 16, multiplier);
+        } else if (strategy_name.find("Document Level") != std::string::npos) {
             count_par_document_level_tls(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
             count_par_fine_grained_locking(DATA_DIR, n_gram_size, fixed_threads, multiplier);
