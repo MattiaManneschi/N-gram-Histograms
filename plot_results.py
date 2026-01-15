@@ -19,8 +19,8 @@ OUTPUT_DIR = "results"
 
 # Colori e marker per le strategie
 STRATEGY_STYLES = {
-    "Hybrid-TLS":   {"color": "tab:blue",   "marker": "o", "linestyle": "-"},
-    "Document-level-TLS":  {"color": "tab:purple",   "marker": "x", "linestyle": "dotted"},
+    "Chunk based":   {"color": "tab:blue",   "marker": "o", "linestyle": "-"},
+    "Document Level":  {"color": "tab:purple",   "marker": "x", "linestyle": "dotted"},
     "Fine-grained-locking": {"color": "tab:green",  "marker": "o", "linestyle": ":"},
     "Single Reader": {"color": "tab:orange", "marker": "o", "linestyle": "-"},
     "On the Fly": {"color": "tab:red", "marker": "x", "linestyle": "dotted"},

@@ -14,7 +14,6 @@ struct BenchmarkResult {
 };
 
 class ResultsExporter {
-private:
     std::string output_dir;
     std::vector<BenchmarkResult> results;
 
