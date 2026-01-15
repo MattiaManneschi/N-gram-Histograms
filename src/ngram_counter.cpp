@@ -376,7 +376,6 @@ void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram
     doc_words.shrink_to_fit();
 
     const size_t corpus_size = corpus.size();
-    if (corpus_size < static_cast<size_t>(ngram_size)) return {};
 
     // -----------------------------------------------------------------------
     // FASE 2: Chunk size ADATTIVO

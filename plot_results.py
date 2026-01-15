@@ -56,8 +56,8 @@ def plot_speedup(df, x_col, title, filename, x_label):
 if os.path.exists(scaling_csv):
     df_scaling = pd.read_csv(scaling_csv)
     plot_speedup(df_scaling, x_col='Threads',
-                 title='Scaling Test: Speedup vs Threads',
-                 filename='scaling_speedup.png',
+                 title='Thread Test: Speedup vs Threads',
+                 filename='thread_speedup.png',
                  x_label='Number of Threads')
 else:
     print(f"⚠ File {scaling_csv} non trovato, salto il test scaling.")
