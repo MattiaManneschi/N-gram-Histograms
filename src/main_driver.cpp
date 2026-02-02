@@ -9,6 +9,7 @@
 #include <numeric>
 #include <omp.h>
 #include <filesystem>
+
 #include "statistics.h"
 
 namespace fs = std::filesystem;
