@@ -67,7 +67,7 @@ int main(const int argc, char* argv[]) {
             sequential_times.push_back(duration_seq.count());
         }*/
 
-        //const double sequential_time = std::accumulate(sequential_times.begin(), sequential_times.end(), 0.0) / static_cast<double>(10);
+        
 
         constexpr double sequential_time = 6.25;
 
@@ -97,7 +97,7 @@ int main(const int argc, char* argv[]) {
 
         std::cout << "\n--- Test sequenziale ---\n" << std::endl;
 
-        //const std::vector<double> sequential_times = get_sequential_times_per_multiplier(MULTIPLIER_STEPS, n_gram_size);
+        
 
         const std::vector sequential_times = {5.93, 10.34, 15.03, 19.81, 24.27, 30.81, 36.84, 40.00, 45.98, 49.52};
 
@@ -219,7 +219,7 @@ std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& 
         if (words.empty())
         {
             std::cerr << "Errore: caricamento fallito per multiplier=" << multiplier << std::endl;
-            sequential_times.push_back(0.0); // Placeholder
+            sequential_times.push_back(0.0); 
             continue;
         }
 
