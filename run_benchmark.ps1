@@ -370,8 +370,6 @@ Core totali:    $( (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcess
 
 
 
-
-
 function Main
 {
     Print-Header
