@@ -8,30 +8,61 @@
 #include <iomanip>
 #include <numeric>
 #include <omp.h>
+#include <filesystem>
+#include "statistics.h"
+
+namespace fs = std::filesystem;
 
 const std::string DATA_DIR = "data/Texts";
 constexpr int TEST_ITER = 1;
 
 
-void run_thread_scaling_test(
-    int n_gram_size,
-    const std::string& strategy_name,
-    int max_threads,
-    double sequential_time,
-    ResultsExporter* exporter);
+void run_thread_scaling_test(int n_gram_size, const std::string& strategy_name,
+                             int max_threads, double sequential_time, ResultsExporter* exporter);
 
-void run_workload_scaling_test(
-    int n_gram_size,
-    int fixed_threads,
-    const std::vector<int>& multiplier_steps,
-    const std::string& strategy_name,
-    const std::vector<double>& sequential_times,
-    ResultsExporter* exporter = nullptr);
+void run_workload_scaling_test(int n_gram_size, int fixed_threads,
+                               const std::vector<int>& multiplier_steps, const std::string& strategy_name,
+                               const std::vector<double>& sequential_times, ResultsExporter* exporter = nullptr);
 
 std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& MULTIPLIER_STEPS, int n_gram_size);
 
-int main(const int argc, char* argv[]) {
+void generate_statistics_plots(int n_gram_size);
 
+
+void generate_and_export_statistics(const Histogram& hist, int n_gram_size, double seq_time)
+{
+    std::cout << "\n--- Generazione Statistiche ---" << std::endl;
+
+    fs::create_directories("results/statistics");
+
+    HistogramStats stats = compute_histogram_stats(hist, 50);
+    FrequencyDistribution dist = compute_frequency_distribution(hist);
+
+    print_histogram_stats(stats);
+    print_frequency_distribution(dist);
+
+    std::string prefix = "results/statistics/" + std::to_string(n_gram_size) + "gram";
+    export_top_k_csv(stats.top_k, prefix + "_top50.csv");
+    export_frequency_distribution_csv(dist, prefix + "_freq_dist.csv");
+
+    FullStatistics full_stats;
+    full_stats.histogram = stats;
+    full_stats.frequency = dist;
+    full_stats.strategy_name = "Sequential";
+    full_stats.ngram_size = n_gram_size;
+    full_stats.num_threads = 1;
+    full_stats.workload_multiplier = 1;
+    full_stats.execution_time_sec = seq_time;
+    full_stats.speedup = 1.0;
+    full_stats.efficiency = 1.0;
+    export_stats_csv(full_stats, prefix + "_stats.csv");
+    export_full_report(full_stats, prefix + "_report.txt");
+
+    std::cout << "Statistiche esportate in: " << prefix << "_*.csv" << std::endl;
+}
+
+int main(const int argc, char* argv[])
+{
     const int n_gram_size = std::stoi(argv[2]);
     const int max_threads = std::stoi(argv[3]);
     std::string test_mode = argv[4];
@@ -43,9 +74,13 @@ int main(const int argc, char* argv[]) {
     std::cout << "\nDati caricati da: " << DATA_DIR << std::endl;
     std::cout << "===========================================" << std::endl;
 
+
+    fs::create_directories("results/statistics");
+
     ResultsExporter exporter("results");
 
-    if (test_mode == "THREAD"){
+    if (test_mode == "THREAD")
+    {
         std::cout << "\n==============================================" << std::endl;
         std::cout << "Esecuzione Test: Thread Scaling (Load Fixed)" << std::endl;
         std::cout << "==============================================" << std::endl;
@@ -55,67 +90,114 @@ int main(const int argc, char* argv[]) {
         std::vector<double> sequential_times;
         const auto words = load_and_tokenize_directory(DATA_DIR);
 
-        /*for (int i = 0; i < TEST_ITER; i++)
+        std::chrono::duration<double> duration_seq = std::chrono::duration<double>::zero();
+
+        for (int i = 0; i < TEST_ITER; i++)
         {
             auto start_seq = std::chrono::high_resolution_clock::now();
-            count_seq(words, n_gram_size);
+            Histogram hist = count_seq(words, n_gram_size);
             auto end_seq = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> duration_seq = end_seq - start_seq;
+            duration_seq = end_seq - start_seq;
 
             std::cout << "I = " << i << " | T = " << duration_seq.count() << std::endl;
-
             sequential_times.push_back(duration_seq.count());
-        }*/
 
-        
 
-        constexpr double sequential_time = 6.25;
+            if (i == 0)
+            {
+                generate_and_export_statistics(hist, n_gram_size, duration_seq.count());
+            }
+        }
 
-        std::cout << "\nTempo sequenziale medio: " << sequential_time << " secondi\n" << std::endl;
+        std::cout << "\n--- Test Parallelo --- \n" << std::endl;
 
-        std::cout << "--- Test Parallelo --- \n" << std::endl;
-
-        run_thread_scaling_test(n_gram_size, "Hybrid-TLS" , max_threads, sequential_time, &exporter);
-        run_thread_scaling_test(n_gram_size, "Single Reader" , max_threads, sequential_time, &exporter);
-        run_thread_scaling_test(n_gram_size, "On the Fly" , max_threads, sequential_time, &exporter);
+        run_thread_scaling_test(n_gram_size, "Hybrid-TLS", max_threads, duration_seq.count(), &exporter);
+        run_thread_scaling_test(n_gram_size, "Single Reader", max_threads, duration_seq.count(), &exporter);
+        run_thread_scaling_test(n_gram_size, "On the Fly", max_threads, duration_seq.count(), &exporter);
 
         std::cout << "\n==============================================" << std::endl;
-        const std::string csv_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
-        const std::string txt_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
+        const std::string csv_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" +
+            std::to_string(max_threads) + ".csv";
+        const std::string txt_filename = "thread_" + std::to_string(n_gram_size) + "gram_t" +
+            std::to_string(max_threads) + "_summary.txt";
 
         exporter.save_scaling_results(csv_filename, n_gram_size);
         exporter.save_summary(txt_filename, n_gram_size);
 
-    } else if (test_mode == "WORKLOAD"){
+        generate_statistics_plots(n_gram_size);
+    }
+    else if (test_mode == "WORKLOAD")
+    {
         std::cout << "\n==============================================" << std::endl;
         std::cout << "Esecuzione Test: Workload Scaling (Threads Fixed)" << std::endl;
         std::cout << "==============================================" << std::endl;
 
         std::vector<int> MULTIPLIER_STEPS(10);
         int val = 1;
-        for (auto& x : MULTIPLIER_STEPS) x=val, val+=1;
+        for (auto& x : MULTIPLIER_STEPS) x = val, val += 1;
 
-        std::cout << "\n--- Test sequenziale ---\n" << std::endl;
+        std::cout << "\n--- Test sequenziale (M=1 per statistiche) ---\n" << std::endl;
 
-        
+        const auto words = load_and_tokenize_directory(DATA_DIR);
+
+        auto start_seq = std::chrono::high_resolution_clock::now();
+        Histogram hist = count_seq(words, n_gram_size);
+        auto end_seq = std::chrono::high_resolution_clock::now();
+        double seq_time_m1 = std::chrono::duration<double>(end_seq - start_seq).count();
+
+        std::cout << "M = 1 | T = " << seq_time_m1 << std::endl;
+
+        generate_and_export_statistics(hist, n_gram_size, seq_time_m1);
 
         const std::vector sequential_times = {5.93, 10.34, 15.03, 19.81, 24.27, 30.81, 36.84, 40.00, 45.98, 49.52};
 
         std::cout << "\n--- Test Parallelo ---\n" << std::endl;
 
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk based", sequential_times, &exporter);
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document Level", sequential_times, &exporter);
-        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained-locking", sequential_times, &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Chunk based", sequential_times,
+                                  &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Document Level", sequential_times,
+                                  &exporter);
+        run_workload_scaling_test(n_gram_size, max_threads, MULTIPLIER_STEPS, "Fine-grained-locking", sequential_times,
+                                  &exporter);
 
         std::cout << "\n==============================================" << std::endl;
-        const std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + ".csv";
-        const std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" + std::to_string(max_threads) + "_summary.txt";
+        const std::string csv_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" +
+            std::to_string(max_threads) + ".csv";
+        const std::string txt_filename = "workload_" + std::to_string(n_gram_size) + "gram_t" +
+            std::to_string(max_threads) + "_summary.txt";
 
         exporter.save_workload_results(csv_filename, n_gram_size, max_threads);
         exporter.save_summary(txt_filename, n_gram_size);
+
+        generate_statistics_plots(n_gram_size);
     }
 
     return 0;
+}
+
+void generate_statistics_plots(int n_gram_size)
+{
+    std::cout << "\n--- Generazione Plot Statistiche ---" << std::endl;
+
+    std::string cmd = "python3 plot_statistics.py " + std::to_string(n_gram_size);
+
+    int result = system(cmd.c_str());
+
+    if (result != 0)
+    {
+        cmd = "python plot_statistics.py " + std::to_string(n_gram_size);
+        result = system(cmd.c_str());
+    }
+
+    if (result == 0)
+    {
+        std::cout << "Plot statistiche generati con successo!" << std::endl;
+    }
+    else
+    {
+        std::cerr << "Attenzione: impossibile generare plot statistiche." << std::endl;
+        std::cerr << "Esegui manualmente: python plot_statistics.py " << n_gram_size << std::endl;
+    }
 }
 
 void run_thread_scaling_test(
@@ -127,18 +209,24 @@ void run_thread_scaling_test(
 {
     std::cout << "Strategia: " << strategy_name << " (Threads=" << max_threads << ")" << std::endl;
 
-    for (int num_threads = 1; num_threads <= max_threads; ++num_threads){
+    for (int num_threads = 1; num_threads <= max_threads; ++num_threads)
+    {
         omp_set_num_threads(num_threads);
         std::vector<double> par_times;
 
-        for ( int i = 0; i < TEST_ITER; i++)
+        for (int i = 0; i < TEST_ITER; i++)
         {
             const auto start_par = omp_get_wtime();
-            if (strategy_name.find("Hybrid-TLS") != std::string::npos) {
+            if (strategy_name.find("Hybrid-TLS") != std::string::npos)
+            {
                 count_par_hybrid_preload_TLS(n_gram_size);
-            } else if (strategy_name.find("Single Reader") != std::string::npos) {
+            }
+            else if (strategy_name.find("Single Reader") != std::string::npos)
+            {
                 count_par_singleReader_Worker_TLS(n_gram_size);
-            } else if (strategy_name.find("On the Fly") != std::string::npos) {
+            }
+            else if (strategy_name.find("On the Fly") != std::string::npos)
+            {
                 count_par_onTheFly_parallelIO(n_gram_size);
             }
             const auto end_par = omp_get_wtime();
@@ -152,13 +240,14 @@ void run_thread_scaling_test(
         const double efficiency = speedup / num_threads;
 
         std::cout << "TH: " << num_threads
-                  << " | N.TEST: " << TEST_ITER
-                  << " | Tempo medio: " << duration_par << "s"
-                  << " | Speedup medio: " << speedup << std::endl;
+            << " | N.TEST: " << TEST_ITER
+            << " | Tempo medio: " << duration_par << "s"
+            << " | Speedup medio: " << speedup << std::endl;
 
-        if (exporter) {
+        if (exporter)
+        {
             exporter->add_result(strategy_name, num_threads,
-                               duration_par, speedup, efficiency);
+                                 duration_par, speedup, efficiency);
         }
     }
 }
@@ -173,17 +262,23 @@ void run_workload_scaling_test(
 {
     std::cout << "Strategia: " << strategy_name << " (Threads=" << fixed_threads << ")" << std::endl;
 
-    for (size_t i = 0; i < multiplier_steps.size(); ++i) {
+    for (size_t i = 0; i < multiplier_steps.size(); ++i)
+    {
         const int multiplier = multiplier_steps[i];
         const double sequential_time = sequential_times[i];
 
         const auto start_par = omp_get_wtime();
 
-        if (strategy_name.find("Chunk based") != std::string::npos) {
-            count_par_chunk_based_adaptive(DATA_DIR,n_gram_size, 16, multiplier);
-        } else if (strategy_name.find("Document Level") != std::string::npos) {
+        if (strategy_name.find("Chunk based") != std::string::npos)
+        {
+            count_par_chunk_based_adaptive(DATA_DIR, n_gram_size, 16, multiplier);
+        }
+        else if (strategy_name.find("Document Level") != std::string::npos)
+        {
             count_par_document_level_tls(DATA_DIR, n_gram_size, fixed_threads, multiplier);
-        } else if (strategy_name.find("Fine-grained-locking") != std::string::npos) {
+        }
+        else if (strategy_name.find("Fine-grained-locking") != std::string::npos)
+        {
             count_par_fine_grained_locking(DATA_DIR, n_gram_size, fixed_threads, multiplier);
         }
 
@@ -194,12 +289,13 @@ void run_workload_scaling_test(
         const double efficiency = (speedup / fixed_threads) * 100.0;
 
         std::cout << "M =" << std::setw(2) << multiplier
-                  << " | T_par: " << std::fixed << std::setprecision(3) << duration_par << "s"
-                  << " | Speedup: " << std::setprecision(2) << speedup << std::endl;
+            << " | T_par: " << std::fixed << std::setprecision(3) << duration_par << "s"
+            << " | Speedup: " << std::setprecision(2) << speedup << std::endl;
 
-        if (exporter) {
+        if (exporter)
+        {
             exporter->add_result(strategy_name, fixed_threads,
-                               duration_par, speedup, efficiency / 100.0, multiplier);
+                                 duration_par, speedup, efficiency / 100.0, multiplier);
         }
     }
 
@@ -219,7 +315,7 @@ std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& 
         if (words.empty())
         {
             std::cerr << "Errore: caricamento fallito per multiplier=" << multiplier << std::endl;
-            sequential_times.push_back(0.0); 
+            sequential_times.push_back(0.0);
             continue;
         }
 
@@ -230,8 +326,8 @@ std::vector<double> get_sequential_times_per_multiplier(const std::vector<int>& 
 
         sequential_times.push_back(seq_time);
 
-        std::cout <<"M =" << std::setw(2) << multiplier
-                  << " | T_seq: " << seq_time << "s" << std::endl;
+        std::cout << "M =" << std::setw(2) << multiplier
+            << " | T_seq: " << seq_time << "s" << std::endl;
 
         words.clear();
         words.shrink_to_fit();

@@ -191,7 +191,8 @@ void count_par_hybrid_preload_TLS(int n_gram_size, int max_iter)
 }
 
 
-void count_par_document_level_tls(const std::string& directory_path, int ngram_size, int num_threads, int multiplier)
+Histogram count_par_document_level_tls(const std::string& directory_path, int ngram_size, int num_threads,
+                                       int multiplier)
 {
     std::vector<fs::path> file_paths;
     for (const auto& entry : fs::directory_iterator(directory_path))
@@ -283,6 +284,7 @@ void count_par_document_level_tls(const std::string& directory_path, int ngram_s
             final_hist[ngram] += count;
         }
     }
+    return final_hist;
 }
 
 void count_par_fine_grained_locking(const std::string& directory_path, int n_gram_size, int num_threads, int multiplier)

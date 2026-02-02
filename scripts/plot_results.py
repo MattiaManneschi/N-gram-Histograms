@@ -15,7 +15,7 @@ threads = int(sys.argv[2])
 
 scaling_csv = f"results/thread_{ngram_size}gram_t{threads}.csv"
 workload_csv = f"results/workload_{ngram_size}gram_t{threads}.csv"
-OUTPUT_DIR = "results"
+OUTPUT_DIR = "../results"
 
 # Colori e marker per le strategie
 STRATEGY_STYLES = {
@@ -67,7 +67,7 @@ if os.path.exists(workload_csv):
     df_workload = pd.read_csv(workload_csv)
     plot_speedup(df_workload, x_col='Multiplier',
                  title='Workload Test: Speedup vs Workload',
-                 filename='workload_speedup.png',
+                 filename='../workload_speedup.png',
                  x_label='Workload Multiplier')
 else:
     print(f"⚠ File {workload_csv} non trovato, salto il test workload.")
