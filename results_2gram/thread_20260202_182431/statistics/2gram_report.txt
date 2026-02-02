@@ -1,0 +1,92 @@
+================================================================
+              N-GRAM ANALYSIS FULL REPORT                       
+================================================================
+
+CONFIGURATION
+----------------------------------------------------------------
+  Strategy:           Sequential
+  N-gram size:        2
+  Threads:            1
+  Workload multiplier:1
+
+PERFORMANCE
+----------------------------------------------------------------
+  Execution time:     5.652 seconds
+  Speedup:            1.00x
+  Efficiency:         100.0%
+
+HISTOGRAM STATISTICS
+----------------------------------------------------------------
+  Total n-gram tokens:    18461127
+  Unique n-grams (vocab): 3411552
+  Max frequency:          139216
+  Min frequency:          1
+  Mean frequency:         5.41
+  Std deviation:          128.69
+  Most common n-gram:     "of the"
+
+TOP 50 N-GRAMS
+----------------------------------------------------------------
+    1. "of the" - 139216
+    2. "in the" - 80627
+    3. "to the" - 58091
+    4. "and the" - 40718
+    5. "to be" - 33452
+    6. "on the" - 31137
+    7. "it is" - 28086
+    8. "of his" - 23699
+    9. "at the" - 23296
+   10. "of a" - 23253
+   11. "from the" - 23250
+   12. "by the" - 22993
+   13. "with the" - 22969
+   14. "it was" - 22448
+   15. "for the" - 22235
+   16. "in a" - 20897
+   17. "” said" - 20431
+   18. "he had" - 20192
+   19. "he was" - 18281
+   20. "that the" - 17978
+   21. "with a" - 17440
+   22. "all the" - 16256
+   23. "that he" - 15802
+   24. "i have" - 15377
+   25. "i am" - 14717
+   26. "in his" - 14455
+   27. "the same" - 14018
+   28. "is the" - 13566
+   29. "had been" - 13359
+   30. "and i" - 13334
+   31. "that i" - 12607
+   32. "and he" - 11668
+   33. "as the" - 11509
+   34. "is a" - 11482
+   35. "to him" - 11331
+   36. "out of" - 11146
+   37. "into the" - 10987
+   38. "was a" - 10485
+   39. "did not" - 10470
+   40. "have been" - 10468
+   41. "is not" - 10412
+   42. "of this" - 10250
+   43. "for a" - 9875
+   44. "the lord" - 9651
+   45. "to his" - 9463
+   46. "and that" - 9456
+   47. "and a" - 9313
+   48. "as a" - 9041
+   49. "one of" - 8970
+   50. "of her" - 8929
+
+FREQUENCY DISTRIBUTION (Zipf's Law Analysis)
+----------------------------------------------------------------
+  Hapax legomena (freq=1): 2315016
+  Dis legomena (freq=2):   428622
+  Tris legomena (freq=3):  179110
+  Hapax ratio:             67.9%
+  Coverage by top 100:     7.8%
+
+================================================================
+  This distribution follows Zipf's Law if hapax ratio is high
+  (typically 40-60% for natural language text)
+================================================================

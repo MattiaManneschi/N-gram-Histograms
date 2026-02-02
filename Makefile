@@ -1,9 +1,26 @@
 # Makefile per Progetto Mid-Term (Bigrammi/Trigrammi)
 
+# Rileva sistema operativo
+UNAME_S := $(shell uname -s)
+
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -O3
-CXXFLAGS_DEBUG = -std=c++17 -Wall -O3 -g  # Con simboli debug per profiling
-OPENMP_FLAG = -fopenmp
+
+# OpenMP flags per diversi sistemi
+ifeq ($(UNAME_S),Darwin)
+    # macOS con Homebrew libomp
+    OPENMP_FLAG = -Xpreprocessor -fopenmp
+    OPENMP_LIBS = -lomp
+    # Percorsi Homebrew (Intel Mac)
+    HOMEBREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /usr/local)
+    CXXFLAGS += -I$(HOMEBREW_PREFIX)/opt/libomp/include
+    LDFLAGS += -L$(HOMEBREW_PREFIX)/opt/libomp/lib
+else
+    # Linux
+    OPENMP_FLAG = -fopenmp
+    OPENMP_LIBS =
+    LDFLAGS =
+endif
 
 TARGET = ngram_analyzer
 SRC_DIR = src
@@ -13,30 +30,42 @@ NTHREADS ?= 16
 NGRAM_SIZE ?= 2
 DATA_DIR ?= data/Texts
 MODE ?= THREAD
+MULTIPLIER ?= 1
 
-.PHONY: all seq par clean run run_all thread workload profile profile_stat profile_record profile_cache
+.PHONY: all seq par clean run run_all thread workload stats
 
 all: $(BIN_DIR)/$(TARGET)_par
 
 # =============================================================================
-# COMPILAZIONE
+# COMPILAZIONE BENCHMARK
 # =============================================================================
 
 $(BIN_DIR)/$(TARGET)_par: $(SRCS) | $(BIN_DIR)
 	@echo "Compiling PARALLEL version..."
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAG) $^ -o $@
+	@echo "System: $(UNAME_S)"
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAG) $^ -o $@ $(LDFLAGS) $(OPENMP_LIBS)
 
 $(BIN_DIR)/$(TARGET)_seq: $(SRCS) | $(BIN_DIR)
 	@echo "Compiling SEQUENTIAL version..."
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-# Versione con simboli debug per profiling
-$(BIN_DIR)/$(TARGET)_profile: $(SRCS) | $(BIN_DIR)
-	@echo "Compiling PROFILE version (with debug symbols)..."
-	$(CXX) $(CXXFLAGS_DEBUG) $(OPENMP_FLAG) $^ -o $@
+# =============================================================================
+# COMPILAZIONE STATISTICS
+# =============================================================================
+
+# Sorgenti per statistics (escludi main_driver.cpp)
+STATS_SRCS = $(SRC_DIR)/data_loader.cpp \
+             $(SRC_DIR)/ngram_counter_stats.cpp \
+             $(SRC_DIR)/statistics.cpp \
+             $(SRC_DIR)/run_statistics.cpp
+
+$(BIN_DIR)/run_statistics: $(STATS_SRCS) | $(BIN_DIR)
+	@echo "Compiling STATISTICS version..."
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAG) $^ -o $@ $(LDFLAGS) $(OPENMP_LIBS)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
+	mkdir -p results/statistics
 
 # =============================================================================
 # ESECUZIONE BENCHMARK
@@ -62,59 +91,23 @@ workload: $(BIN_DIR)/$(TARGET)_par
 	python3 plot_results.py $(NGRAM_SIZE) $(NTHREADS)
 
 # =============================================================================
-# PROFILING CON PERF (Linux - funziona su AMD e Intel)
+# STATISTICHE
 # =============================================================================
 
-# Statistiche generali (CPU, IPC, cache)
-profile_stat: $(BIN_DIR)/$(TARGET)_profile
-	@echo "=== PERF STAT: Statistiche generali ==="
-	perf stat -e cycles,instructions,cache-references,cache-misses,branches,branch-misses \
-		./$(BIN_DIR)/$(TARGET)_profile $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
+stats: $(BIN_DIR)/run_statistics
+	@echo "=== Generating N-gram Statistics ==="
+	./$(BIN_DIR)/run_statistics $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MULTIPLIER)
+	@echo "=== Generating Zipf Plot ==="
+	python3 plot_statistics.py $(NGRAM_SIZE) $(MULTIPLIER)
 
-# Record + Report (hotspots)
-profile_record: $(BIN_DIR)/$(TARGET)_profile
-	@echo "=== PERF RECORD: Registrazione hotspots ==="
-	perf record -g ./$(BIN_DIR)/$(TARGET)_profile $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
-	@echo "=== PERF REPORT: Analisi ==="
-	perf report
-
-# Analisi cache dettagliata
-profile_cache: $(BIN_DIR)/$(TARGET)_profile
-	@echo "=== PERF STAT: Analisi Cache ==="
-	perf stat -e L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
-		./$(BIN_DIR)/$(TARGET)_profile $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
-
-# Profiling completo (stat + record)
-profile: profile_stat
-	@echo ""
-	@echo "Per analisi hotspots dettagliata, esegui: make profile_record"
-	@echo "Per analisi cache dettagliata, esegui: make profile_cache"
-
-# =============================================================================
-# PROFILING CON AMD uProf (se installato)
-# =============================================================================
-
-UPROF_CLI = AMDuProfCLI
-UPROF_OUTPUT = ./uprof_output
-
-profile_uprof: $(BIN_DIR)/$(TARGET)_profile
-	@echo "=== AMD uProf: Profiling ==="
-	@mkdir -p $(UPROF_OUTPUT)
-	$(UPROF_CLI) collect --config tbp -o $(UPROF_OUTPUT) \
-		./$(BIN_DIR)/$(TARGET)_profile $(DATA_DIR) $(NGRAM_SIZE) $(NTHREADS) $(MODE)
-	@echo "=== AMD uProf: Report ==="
-	$(UPROF_CLI) report -i $(UPROF_OUTPUT)
-
-# =============================================================================
-# PROFILING CON VALGRIND/CALLGRIND (indipendente da CPU)
-# =============================================================================
-
-profile_callgrind: $(BIN_DIR)/$(TARGET)_profile
-	@echo "=== CALLGRIND: Analisi call graph ==="
-	@echo "NOTA: Valgrind è lento, usa NTHREADS=1 e NGRAM_SIZE=2"
-	valgrind --tool=callgrind --callgrind-out-file=callgrind.out \
-		./$(BIN_DIR)/$(TARGET)_profile $(DATA_DIR) 2 1 $(MODE)
-	@echo "Visualizza con: kcachegrind callgrind.out"
+stats_all: $(BIN_DIR)/run_statistics
+	@echo "=== Generating Statistics for 2-grams ==="
+	./$(BIN_DIR)/run_statistics $(DATA_DIR) 2 $(NTHREADS) 1
+	@echo "=== Generating Statistics for 3-grams ==="
+	./$(BIN_DIR)/run_statistics $(DATA_DIR) 3 $(NTHREADS) 1
+	@echo "=== Generating Plots ==="
+	python3 plot_statistics.py 2 1
+	python3 plot_statistics.py 3 1
 
 # =============================================================================
 # CLEAN
@@ -122,5 +115,5 @@ profile_callgrind: $(BIN_DIR)/$(TARGET)_profile
 
 clean:
 	rm -rf $(BIN_DIR)
-	rm -f perf.data perf.data.old callgrind.out*
-	rm -rf $(UPROF_OUTPUT)
+	rm -f results/*.csv results/*.png results/*.txt
+	rm -rf results/statistics
