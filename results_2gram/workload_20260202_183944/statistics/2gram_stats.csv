@@ -1,0 +1,20 @@
+metric,value
+strategy,Sequential
+ngram_size,2
+num_threads,1
+multiplier,1
+execution_time_sec,5.663842
+speedup,1.0000
+efficiency,1.0000
+total_ngrams,18461127
+unique_ngrams,3411552
+max_frequency,139216
+min_frequency,1
+mean_frequency,5.4114
+std_deviation,128.6872
+most_common,"of the"
+hapax_legomena,2315016
+dis_legomena,428622
+tris_legomena,179110
+hapax_ratio,0.6786
+coverage_top_100,7.8033
