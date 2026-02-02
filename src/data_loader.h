@@ -12,4 +12,4 @@ std::vector<std::string> load_and_tokenize_directory(const std::string& dirname,
 
 DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_path, int multiplier = 1);
 
-#endif // TEXT_PROCESSOR_H
+#endif 

@@ -23,16 +23,16 @@ std::vector<std::string> load_and_tokenize_directory(const std::string& dirname,
     for (const auto& entry : fs::directory_iterator(dir_path)) {
         if (entry.is_regular_file() && entry.path().extension() == ".txt") {
             
-            // Apertura e lettura del file
+            
             std::ifstream file(entry.path());
             if (file.is_open()) {
                 std::stringstream buffer;
                 buffer << file.rdbuf();
                 full_text_buffer += buffer.str();
-                full_text_buffer += " "; // Aggiunge uno spazio tra i libri per separare le parole
+                full_text_buffer += " "; 
             }
             file.close();
-            //std::cout << "  - Aggregato: " << entry.path().filename().string() << std::endl;
+            
         }
     }
     
@@ -71,18 +71,18 @@ DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_pa
 
     fs::path dir_path(directory_path);
 
-    // Controllo di validità del percorso
+    
     if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
         return {};
     }
 
     try {
-        // Itera su tutti gli elementi nella directory
+        
         for (const auto& entry : fs::directory_iterator(dir_path)) {
             
             if (entry.is_regular_file() && entry.path().extension() == ".txt") {
                 
-                // 1. Apertura e lettura del file in una singola stringa buffer
+                
                 std::ifstream file(entry.path());
                 if (!file.is_open()) {
                     continue;
@@ -93,14 +93,14 @@ DocumentCorpus load_and_tokenize_document_corpus(const std::string& directory_pa
                 std::string text = buffer.str();
                 file.close();
 
-                // TOKENIZZAZIONE
+                
                 std::vector<std::string> words = tokenize_text(text); 
 
-                // Aggiunge il vettore di parole del documento al Corpus (mantenendo la separazione)
+                
                 if (!words.empty()) {
                     doc_corpus.push_back(words);
-                    //std::cout << "  - Caricato documento: " << entry.path().filename().string() 
-                              //<< " (" << words.size() << " parole)" << std::endl;
+                    
+                              
                 }
             }
         }
@@ -133,14 +133,14 @@ std::vector<std::string> tokenize_text(const std::string& text) {
     std::vector<std::string> words;
     std::string processed_text = text; 
     
-    // NORMALIZZAZIONE SIMD (Lowercase)
+    
     #pragma omp simd
     for (size_t i = 0; i < processed_text.length(); ++i) {
-        // Usa std::tolower solo sui caratteri ASCII (è più veloce del locale-aware)
+        
         processed_text[i] = std::tolower(processed_text[i]);
     }
 
-    // NORMALIZZAZIONE SIMD (Punteggiatura e Whitespace)
+    
     #pragma omp simd
     for (size_t i = 0; i < processed_text.length(); ++i) {
         char c = processed_text[i];
@@ -149,7 +149,7 @@ std::vector<std::string> tokenize_text(const std::string& text) {
         }
     }
     
-    // TOKENIZZAZIONE (Sequenziale)
+    
     std::stringstream ss(processed_text);
     std::string word;
     while (ss >> word) {

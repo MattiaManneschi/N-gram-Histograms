@@ -8,7 +8,7 @@
 namespace fs = std::filesystem;
 
 ResultsExporter::ResultsExporter(const std::string& dir) : output_dir(dir) {
-    // Crea la directory se non esiste
+    
     if (!fs::exists(output_dir)) {
         fs::create_directories(output_dir);
         std::cout << "Creata directory: " << output_dir << std::endl;
@@ -38,10 +38,10 @@ void ResultsExporter::save_scaling_results(const std::string& filename, int ngra
         return;
     }
     
-    // Header CSV
+    
     file << "Strategy,Threads,Time_seconds,Speedup,Efficiency_percent\n";
     
-    // Dati
+    
     file << std::fixed << std::setprecision(6);
     for (const auto& r : results) {
         file << r.strategy_name << ","
@@ -66,10 +66,10 @@ void ResultsExporter::save_workload_results(const std::string& filename,
         return;
     }
     
-    // Header CSV
+    
     file << "Strategy,Multiplier,Threads,Time_seconds,Speedup,Efficiency_percent\n";
     
-    // Dati
+    
     file << std::fixed << std::setprecision(6);
     for (const auto& [strategy_name, num_threads, time_seconds, speedup, efficiency, workload_multiplier] : results) {
         file << strategy_name << ","
@@ -98,7 +98,7 @@ void ResultsExporter::save_summary(const std::string& filename, int ngram_size) 
     file << "SUMMARY REPORT - " << ngram_size << "-grammi\n";
     file << "===============================================\n\n";
     
-    // Raggruppa per strategia
+    
     std::vector<std::string> strategies;
     for (const auto& r : results) {
         if (std::find(strategies.begin(), strategies.end(), r.strategy_name) == strategies.end()) {

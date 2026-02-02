@@ -14,7 +14,7 @@
 namespace fs = std::filesystem;
 
 
-// Sequenziale
+
 
 Histogram count_seq(const std::vector<std::string>& words, const int n_gram_size) {
     Histogram hist;
@@ -30,7 +30,7 @@ Histogram count_seq(const std::vector<std::string>& words, const int n_gram_size
     return hist;
 }
 
-// Parallelo Thread scaling
+
 
 void count_par_singleReader_Worker_TLS(int n_gram_size, int max_iter)
 {
@@ -42,16 +42,16 @@ void count_par_singleReader_Worker_TLS(int n_gram_size, int max_iter)
     {
          Histogram thread_word_hist;
 
-        // Iterate over the texts
+        
         for (int k=0;k<max_iter;k++) {
             for (const auto &document: std::filesystem::directory_iterator("data/Texts")) {
 
-                // Obtain the path of the next file
+                
                 std::string document_path = document.path().string();
                 std::ifstream file(document_path);
 
                 #pragma omp single
-                {   // Open the file and read the document
+                {   
                     if (file.is_open()) {
                         std::string content;
 
@@ -89,7 +89,7 @@ void count_par_singleReader_Worker_TLS(int n_gram_size, int max_iter)
 
 void count_par_onTheFly_parallelIO(const int n_gram_size, int max_iter){
 
-    // Count the number of texts in the folder
+    
     int doc_count = 0;
     for ([[maybe_unused]] const auto &document: std::filesystem::directory_iterator("data/Texts")) {
         doc_count++;
@@ -178,11 +178,11 @@ void count_par_hybrid_preload_TLS(int n_gram_size, int max_iter){
     }
 }
 
-// Parallelo Workload scaling
+
 
 void count_par_document_level_tls(const std::string& directory_path, int ngram_size, int num_threads, int multiplier)
 {
-    // FASE 1: Raccogli path file
+    
     std::vector<fs::path> file_paths;
     for (const auto& entry : fs::directory_iterator(directory_path)) {
         if (entry.is_regular_file() && entry.path().extension() == ".txt") {
@@ -193,7 +193,7 @@ void count_par_document_level_tls(const std::string& directory_path, int ngram_s
     const size_t num_docs = file_paths.size();
     const size_t total_tasks = num_docs * static_cast<size_t>(multiplier);
 
-    // FASE 2: Caricamento PARALLELO (era sequenziale!)
+    
     std::vector<std::vector<std::string>> tokenized_docs(num_docs);
 
     #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
@@ -202,7 +202,7 @@ void count_par_document_level_tls(const std::string& directory_path, int ngram_s
         tokenized_docs[i] = tokenize_text(content);
     }
 
-    // FASE 3: Pre-allocazione histogram
+    
     std::vector<Histogram> local_hists(num_threads);
 
     size_t estimated_ngrams = 0;
@@ -217,20 +217,20 @@ void count_par_document_level_tls(const std::string& directory_path, int ngram_s
         hist.reserve(estimated_ngrams / (num_threads * 3));
     }
 
-    // FASE 4: Conteggio ZERO-COPY
+    
     #pragma omp parallel num_threads(num_threads)
     {
         const int tid = omp_get_thread_num();
         Histogram& my_hist = local_hists[tid];
 
-        // Buffer riutilizzabile (1 allocazione invece di milioni)
+        
         std::string ngram_buffer;
         ngram_buffer.reserve(128);
 
         #pragma omp for schedule(dynamic, 4)
         for (size_t task_id = 0; task_id < total_tasks; ++task_id) {
 
-            // ZERO-COPY: accesso tramite indice, nessuna copia
+            
             const size_t doc_idx = task_id % num_docs;
             const std::vector<std::string>& words = tokenized_docs[doc_idx];
 
@@ -245,7 +245,7 @@ void count_par_document_level_tls(const std::string& directory_path, int ngram_s
         }
     }
 
-    // FASE 5: Riduzione ottimizzata (move invece di copia)
+    
     size_t max_idx = 0;
     size_t max_size = 0;
     for (size_t i = 0; i < local_hists.size(); ++i) {
@@ -340,9 +340,9 @@ void count_par_fine_grained_locking(const std::string& directory_path, int n_gra
 }
 
 void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram_size, int num_threads, int multiplier){
-    // -----------------------------------------------------------------------
-    // FASE 1: Carica corpus
-    // -----------------------------------------------------------------------
+    
+    
+    
     std::vector<fs::path> file_paths;
     for (const auto& entry : fs::directory_iterator(directory_path)) {
         if (entry.is_regular_file() && entry.path().extension() == ".txt") {
@@ -377,18 +377,18 @@ void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram
 
     const size_t corpus_size = corpus.size();
 
-    // -----------------------------------------------------------------------
-    // FASE 2: Chunk size ADATTIVO
-    //         Obiettivo: circa 4-8 chunk per thread per buon bilanciamento
-    // -----------------------------------------------------------------------
+    
+    
+    
+    
 
     const size_t num_ngrams = corpus_size - ngram_size + 1;
     const size_t target_chunks_per_thread = 6;
     const size_t target_total_chunks = num_threads * target_chunks_per_thread;
 
-    // Chunk size calcolato dinamicamente
+    
     size_t chunk_size = std::max(
-        static_cast<size_t>(1000),  // Minimo 1000 parole
+        static_cast<size_t>(1000),  
         num_ngrams / target_total_chunks
     );
 
@@ -396,9 +396,9 @@ void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram
     const size_t effective_chunk = chunk_size;
     const size_t num_chunks = (num_ngrams + effective_chunk - 1) / effective_chunk;
 
-    // -----------------------------------------------------------------------
-    // FASE 3: Processing
-    // -----------------------------------------------------------------------
+    
+    
+    
 
     std::vector<Histogram> local_hists(num_threads);
     for (auto& h : local_hists) {
@@ -426,9 +426,9 @@ void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram
         }
     }
 
-    // -----------------------------------------------------------------------
-    // FASE 4: Riduzione
-    // -----------------------------------------------------------------------
+    
+    
+    
 
     size_t max_idx = 0;
     size_t max_size = 0;
@@ -450,7 +450,7 @@ void count_par_chunk_based_adaptive(const std::string& directory_path, int ngram
 
 }
 
-// Support functions
+
 
 void UpdateHistogramWord(Histogram& hist, const std::string& text, const int n_gram_size) {
     std::istringstream stream(text);

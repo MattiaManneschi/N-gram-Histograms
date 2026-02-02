@@ -10,7 +10,7 @@ struct BenchmarkResult {
     double time_seconds;
     double speedup;
     double efficiency;
-    int workload_multiplier;  // Per workload scaling (1 se non applicabile)
+    int workload_multiplier;  
 };
 
 class ResultsExporter {
@@ -34,4 +34,4 @@ public:
 
 
 
-#endif //MID_TERM_NGRAM_PARALLEL_RESULTS_EXPORTS_H
+#endif 
