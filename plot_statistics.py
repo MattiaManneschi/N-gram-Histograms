@@ -25,7 +25,7 @@ plt.rcParams['figure.dpi'] = 150
 plt.rcParams['savefig.dpi'] = 150
 plt.rcParams['font.size'] = 10
 
-STATS_DIR = "../results/statistics"
+STATS_DIR = "results/statistics"
 
 
 def plot_zipf(ngram_size):
