@@ -1,0 +1,61 @@
+===============================================
+SUMMARY REPORT - 3-grammi
+===============================================
+
+
+--- Hybrid-TLS ---
+  Threads:  1 | Time: 23.9317s | Speedup: 0.40 | Efficiency: 40.1%
+  Threads:  2 | Time: 18.2458s | Speedup: 0.53 | Efficiency: 26.3%
+  Threads:  3 | Time: 14.6884s | Speedup: 0.65 | Efficiency: 21.8%
+  Threads:  4 | Time: 12.0573s | Speedup: 0.80 | Efficiency: 19.9%
+  Threads:  5 | Time: 15.9383s | Speedup: 0.60 | Efficiency: 12.0%
+  Threads:  6 | Time: 11.4719s | Speedup: 0.84 | Efficiency: 13.9%
+  Threads:  7 | Time: 10.8436s | Speedup: 0.88 | Efficiency: 12.6%
+  Threads:  8 | Time: 10.8265s | Speedup: 0.89 | Efficiency: 11.1%
+  Threads:  9 | Time: 12.6788s | Speedup: 0.76 | Efficiency: 8.4%
+  Threads: 10 | Time: 10.3275s | Speedup: 0.93 | Efficiency: 9.3%
+  Threads: 11 | Time: 11.8471s | Speedup: 0.81 | Efficiency: 7.4%
+  Threads: 12 | Time: 9.8043s | Speedup: 0.98 | Efficiency: 8.2%
+  Threads: 13 | Time: 10.1006s | Speedup: 0.95 | Efficiency: 7.3%
+  Threads: 14 | Time: 10.1004s | Speedup: 0.95 | Efficiency: 6.8%
+  Threads: 15 | Time: 10.2495s | Speedup: 0.94 | Efficiency: 6.2%
+  Threads: 16 | Time: 9.8880s | Speedup: 0.97 | Efficiency: 6.1%
+  → Best: 12 threads (speedup: 0.98x)
+
+--- Single Reader ---
+  Threads:  1 | Time: 21.5417s | Speedup: 0.45 | Efficiency: 44.5%
+  Threads:  2 | Time: 16.2465s | Speedup: 0.59 | Efficiency: 29.5%
+  Threads:  3 | Time: 13.6774s | Speedup: 0.70 | Efficiency: 23.4%
+  Threads:  4 | Time: 12.7203s | Speedup: 0.75 | Efficiency: 18.9%
+  Threads:  5 | Time: 12.0771s | Speedup: 0.79 | Efficiency: 15.9%
+  Threads:  6 | Time: 11.4189s | Speedup: 0.84 | Efficiency: 14.0%
+  Threads:  7 | Time: 11.1093s | Speedup: 0.86 | Efficiency: 12.3%
+  Threads:  8 | Time: 10.9145s | Speedup: 0.88 | Efficiency: 11.0%
+  Threads:  9 | Time: 10.8027s | Speedup: 0.89 | Efficiency: 9.9%
+  Threads: 10 | Time: 10.5614s | Speedup: 0.91 | Efficiency: 9.1%
+  Threads: 11 | Time: 10.5062s | Speedup: 0.91 | Efficiency: 8.3%
+  Threads: 12 | Time: 10.5820s | Speedup: 0.91 | Efficiency: 7.6%
+  Threads: 13 | Time: 10.5769s | Speedup: 0.91 | Efficiency: 7.0%
+  Threads: 14 | Time: 10.0377s | Speedup: 0.96 | Efficiency: 6.8%
+  Threads: 15 | Time: 10.4332s | Speedup: 0.92 | Efficiency: 6.1%
+  Threads: 16 | Time: 10.4054s | Speedup: 0.92 | Efficiency: 5.8%
+  → Best: 14 threads (speedup: 0.96x)
+
+--- On the Fly ---
+  Threads:  1 | Time: 20.1576s | Speedup: 0.48 | Efficiency: 47.6%
+  Threads:  2 | Time: 14.1083s | Speedup: 0.68 | Efficiency: 34.0%
+  Threads:  3 | Time: 12.6848s | Speedup: 0.76 | Efficiency: 25.2%
+  Threads:  4 | Time: 11.3753s | Speedup: 0.84 | Efficiency: 21.1%
+  Threads:  5 | Time: 12.0159s | Speedup: 0.80 | Efficiency: 16.0%
+  Threads:  6 | Time: 10.2966s | Speedup: 0.93 | Efficiency: 15.5%
+  Threads:  7 | Time: 10.2298s | Speedup: 0.94 | Efficiency: 13.4%
+  Threads:  8 | Time: 10.1905s | Speedup: 0.94 | Efficiency: 11.8%
+  Threads:  9 | Time: 9.6206s | Speedup: 1.00 | Efficiency: 11.1%
+  Threads: 10 | Time: 10.2320s | Speedup: 0.94 | Efficiency: 9.4%
+  Threads: 11 | Time: 9.8495s | Speedup: 0.97 | Efficiency: 8.9%
+  Threads: 12 | Time: 9.6501s | Speedup: 0.99 | Efficiency: 8.3%
+  Threads: 13 | Time: 9.5735s | Speedup: 1.00 | Efficiency: 7.7%
+  Threads: 14 | Time: 9.5204s | Speedup: 1.01 | Efficiency: 7.2%
+  Threads: 15 | Time: 9.4430s | Speedup: 1.02 | Efficiency: 6.8%
+  Threads: 16 | Time: 9.3921s | Speedup: 1.02 | Efficiency: 6.4%
+  → Best: 16 threads (speedup: 1.02x)
