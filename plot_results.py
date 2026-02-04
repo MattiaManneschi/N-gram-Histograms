@@ -67,7 +67,7 @@ if os.path.exists(workload_csv):
     df_workload = pd.read_csv(workload_csv)
     plot_speedup(df_workload, x_col='Multiplier',
                  title='Workload Test: Speedup vs Workload',
-                 filename='results_2gram/workload_20260202_183944/workload_speedup.png',
+                 filename='workload_speedup.png',
                  x_label='Workload Multiplier')
 else:
     print(f"⚠ File {workload_csv} non trovato, salto il test workload.")
