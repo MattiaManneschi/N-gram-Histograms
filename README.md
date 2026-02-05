@@ -16,7 +16,3 @@ Mid-term project for the **Parallel Programming** course - University of Florenc
 ```bash
 ./run_benchmark.sh
 ```
-
-## Author
-
-Mattia Manneschi
